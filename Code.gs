@@ -2549,8 +2549,9 @@ function registrarAsistenciaBatch(records) {
       throw new Error('Sheet "RegistroAsistencia" not found');
     }
 
-    // Preparar datos para escritura
+    // Preparar datos para escritura, incluyendo AsistenciaID único para cada registro
     const dataRows = records.map(rec => [
+      Utilities.getUuid(),  // AsistenciaID - ID único para cada registro de asistencia
       rec.IDEstudiante,
       rec.NombreEstudiante,
       rec.CursoID,
