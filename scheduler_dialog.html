@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      margin: 0;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    select, input {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 15px;
+      padding: 8px 16px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #357ae8;
+    }
+    .dias-group {
+      margin-top: 8px;
+    }
+    .dias-group label {
+      display: inline-block;
+      margin-right: 10px;
+      font-weight: normal;
+    }
+  </style>
+</head>
+<body>
+  <h3>Programar Reporte de Asistencia</h3>
+
+  <label>Frecuencia:</label>
+  <select id="freq">
+    <option value="diaria">Diaria</option>
+    <option value="semanal">Semanal</option>
+    <option value="mensual">Mensual</option>
+  </select>
+
+  <label>Hora del día:</label>
+  <input type="number" id="hora" min="0" max="23" value="8" placeholder="0-23">
+
+  <label>Minutos:</label>
+  <input type="number" id="min" min="0" max="59" value="0" placeholder="0-59">
+
+  <div id="diasContainer" style="display:none;">
+    <label>Días de la semana:</label>
+    <div class="dias-group">
+      <label><input type="checkbox" value="1"> Lunes</label>
+      <label><input type="checkbox" value="2"> Martes</label>
+      <label><input type="checkbox" value="3"> Miércoles</label>
+      <label><input type="checkbox" value="4"> Jueves</label>
+      <label><input type="checkbox" value="5"> Viernes</label>
+      <label><input type="checkbox" value="6"> Sábado</label>
+      <label><input type="checkbox" value="0"> Domingo</label>
+    </div>
+  </div>
+
+  <button onclick="guardarProgr()">Programar</button>
+
+  <script>
+    const freqSel = document.getElementById('freq');
+    const diasCont = document.getElementById('diasContainer');
+
+    freqSel.addEventListener('change', function() {
+      diasCont.style.display = (freqSel.value === 'semanal') ? 'block' : 'none';
+    });
+
+    function guardarProgr() {
+      const freq = freqSel.value;
+      const hora = parseInt(document.getElementById('hora').value);
+      const min = parseInt(document.getElementById('min').value);
+
+      if (isNaN(hora) || hora < 0 || hora > 23) {
+        alert('La hora debe estar entre 0 y 23');
+        return;
+      }
+      if (isNaN(min) || min < 0 || min > 59) {
+        alert('Los minutos deben estar entre 0 y 59');
+        return;
+      }
+
+      let dias = [];
+      if (freq === 'semanal') {
+        const checks = diasCont.querySelectorAll('input[type="checkbox"]:checked');
+        if (checks.length === 0) {
+          alert('Selecciona al menos un día de la semana');
+          return;
+        }
+        dias = Array.from(checks).map(c => c.value);
+      }
+
+      const data = { freq, hora, min, dias };
+
+      google.script.run
+        .withSuccessHandler(function() {
+          alert('✅ Programación guardada exitosamente');
+          google.script.host.close();
+        })
+        .withFailureHandler(function(err) {
+          alert('❌ Error: ' + err);
+        })
+        .saveSchedule(data);
+    }
+  </script>
+</body>
+</html>
