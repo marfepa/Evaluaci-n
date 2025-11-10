@@ -658,6 +658,7 @@
   <div class="header">
     <h1>📊 Panel de Control de Evaluación</h1>
     <p>Sistema integral de gestión educativa</p>
+    <div id="modeIndicator" style="position: absolute; top: 1rem; right: 1rem; padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border-radius: 8px; font-size: 0.875rem; display: none;"></div>
   </div>
 
   <div class="container">
@@ -1243,13 +1244,24 @@
     // ============================================================================
 
     // Detect if running in modal (google.script.run available) or web app mode
-    const isModalMode = typeof google !== 'undefined' && google.script && google.script.run;
+    // Verificación más robusta para detectar el modo correctamente
+    const isModalMode = (function() {
+      try {
+        return typeof google !== 'undefined' &&
+               google.script &&
+               typeof google.script.run !== 'undefined';
+      } catch (e) {
+        return false;
+      }
+    })();
     const isWebAppMode = !isModalMode;
 
     // Store webapp URL if in web app mode
     let webAppUrl = window.location.origin + window.location.pathname;
 
     console.log('Dashboard Mode:', isModalMode ? 'Modal Dialog' : 'Web App');
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Window location:', window.location.href);
 
     /**
      * Universal API call wrapper that works in both modal and web app modes
@@ -1261,29 +1273,55 @@
       return new Promise((resolve, reject) => {
         if (isModalMode) {
           // Modal mode: use google.script.run
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            [functionName](...args);
+          try {
+            google.script.run
+              .withSuccessHandler(function(result) {
+                console.log(`Success: ${functionName}`, result);
+                resolve(result);
+              })
+              .withFailureHandler(function(error) {
+                console.error(`Error calling ${functionName}:`, error);
+                reject(new Error(error.message || error.toString()));
+              })
+              [functionName](...args);
+          } catch (error) {
+            console.error(`Exception calling ${functionName}:`, error);
+            reject(error);
+          }
         } else {
           // Web app mode: use fetch to call the backend
+          console.log(`Calling ${functionName} via POST`, args);
           fetch(webAppUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
             body: JSON.stringify({
               function: functionName,
               arguments: args
-            })
+            }),
+            mode: 'cors',
+            credentials: 'include'
           })
-          .then(response => response.json())
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+          })
           .then(data => {
+            console.log(`Response from ${functionName}:`, data);
             if (data.error) {
               reject(new Error(data.error));
             } else {
               resolve(data.result);
             }
           })
-          .catch(reject);
+          .catch(error => {
+            console.error(`Fetch error calling ${functionName}:`, error);
+            reject(error);
+          });
         }
       });
     }
@@ -2369,8 +2407,20 @@
       console.log('Initializing dashboard...');
       console.log('Mode:', isModalMode ? 'Modal Dialog' : 'Web App');
 
+      // Show mode indicator (optional, can be hidden in production)
+      const modeIndicator = document.getElementById('modeIndicator');
+      if (modeIndicator) {
+        modeIndicator.textContent = isModalMode ? '🔹 Modal Mode' : '🌐 Web App Mode';
+        // Uncomment to show mode indicator:
+        // modeIndicator.style.display = 'block';
+      }
+
       // Load initial statistics
-      loadStats();
+      loadStats().catch(err => {
+        console.error('Error loading initial stats:', err);
+        showError('No se pudieron cargar las estadísticas iniciales',
+                  'Por favor, verifica tu conexión y recarga la página.');
+      });
 
       // Setup modal click-outside-to-close behavior
       document.querySelectorAll('.modal').forEach(modal => {
@@ -2395,6 +2445,16 @@
             }
           }
         });
+      });
+
+      // Add Escape key support for closing modals
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const activeModal = document.querySelector('.modal.active');
+          if (activeModal) {
+            closeModal(activeModal.id);
+          }
+        }
       });
 
       console.log('Dashboard initialized successfully');

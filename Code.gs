@@ -93,13 +93,14 @@ function doPost(e) {
 
     Logger.log(`Calling function: ${functionName} with args: ${JSON.stringify(args)}`);
 
-    // Verificar que la función existe y es llamable
-    if (typeof this[functionName] !== 'function') {
+    // Verificar que la función existe y es llamable en el scope global
+    const globalFunc = (typeof globalThis !== 'undefined' ? globalThis : this)[functionName];
+    if (typeof globalFunc !== 'function') {
       throw new Error(`Function ${functionName} not found or not callable`);
     }
 
     // Llamar a la función con los argumentos
-    const result = this[functionName].apply(this, args);
+    const result = globalFunc.apply(null, args);
 
     // Retornar el resultado como JSON
     return ContentService
@@ -1361,13 +1362,13 @@ function openDashboardInNewWindow() {
 
 /**
  * Abre el dashboard en un modal dentro de Google Sheets
+ * Optimizado para mejor visualización
  */
 function openDashboardInModal() {
   const html = HtmlService.createHtmlOutputFromFile('dashboard')
-    .setWidth(1400)
-    .setHeight(900)
-    .setTitle('📊 Panel de Control de Evaluación')
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    .setWidth(1200)  // Tamaño más manejable que se adapta a la mayoría de pantallas
+    .setHeight(800)  // Altura óptima que permite ver el contenido sin scroll excesivo
+    .setTitle('📊 Panel de Control de Evaluación');
 
   SpreadsheetApp.getUi().showModalDialog(html, '📊 Panel de Control de Evaluación');
 }
