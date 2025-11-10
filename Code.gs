@@ -608,8 +608,8 @@ function onOpen() {
         .addItem('📄 Reporte por alumno', 'reportePorEstudiante')
         .addItem('📚 Reporte por curso', 'reportePorCurso')
         .addSeparator()
-        .addItem('🔄 Comparar 2 alumnos', 'compararEstudiantes')
-        .addItem('🔄 Comparar 2 cursos', 'compararCursos')
+        .addItem('🔄 Comparar 2 alumnos', 'compararEstudiantesDialog')
+        .addItem('🔄 Comparar 2 cursos', 'compararCursosDialog')
         .addSeparator()
         .addItem('📊 Reporte AVANZADO', 'reporteAsistenciaAvanzada_UI')
     )
@@ -617,11 +617,11 @@ function onOpen() {
     // --- SECCIÓN CALIFICACIONES ---
     .addSubMenu(
       ui.createMenu('📝 Calificaciones')
-        .addItem('👤 Por alumno', 'reporteCalificacionPorEstudiante')
-        .addItem('📚 Por curso', 'reporteCalificacionPorCurso')
+        .addItem('👤 Por alumno', 'reporteCalificacionPorEstudianteDialog')
+        .addItem('📚 Por curso', 'reporteCalificacionPorCursoDialog')
         .addSeparator()
-        .addItem('🔄 Comparar 2 alumnos', 'compararCalificacionesEstudiantes')
-        .addItem('🔄 Comparar 2 cursos', 'compararCalificacionesCursos')
+        .addItem('🔄 Comparar 2 alumnos', 'compararCalificacionesEstudiantesDialog')
+        .addItem('🔄 Comparar 2 cursos', 'compararCalificacionesCursosDialog')
         .addSeparator()
         .addItem('📄 Generar reporte de notas', 'reporteNotasSituacion')
         .addItem('🧮 Calcular medias ponderadas', 'calculaMediaPonderadaDesdeHoja')
@@ -1497,6 +1497,31 @@ function reportePorCurso(curso) {
   }
 }
 
+/**
+ * Wrapper Dialog para reporteCalificacionPorEstudiante
+ * Solicita el ID del estudiante al usuario mediante un diálogo
+ */
+function reporteCalificacionPorEstudianteDialog() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Calificaciones por alumno', 'Ingrese el ID o nombre del estudiante:', ui.ButtonSet.OK_CANCEL);
+
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+
+  const alumno = r.getResponseText().trim();
+  if (!alumno) {
+    ui.alert('Por favor ingrese un ID o nombre de estudiante válido');
+    return;
+  }
+
+  const resultado = reporteCalificacionPorEstudiante(alumno);
+
+  if (resultado.success === false) {
+    ui.alert(resultado.message);
+  } else {
+    ui.showSidebar(HtmlService.createHtmlOutput('✅ «Reporte_Calificaciones» generado').setWidth(200));
+  }
+}
+
 function reporteCalificacionPorEstudiante(alumno) {
   try {
     if (!alumno) {
@@ -1548,6 +1573,31 @@ function reporteCalificacionPorEstudiante(alumno) {
   } catch (error) {
     Logger.log('Error en reporteCalificacionPorEstudiante: ' + error);
     return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Wrapper Dialog para reporteCalificacionPorCurso
+ * Solicita el ID del curso al usuario mediante un diálogo
+ */
+function reporteCalificacionPorCursoDialog() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Calificaciones por curso', 'Ingrese el ID del curso:', ui.ButtonSet.OK_CANCEL);
+
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+
+  const curso = r.getResponseText().trim();
+  if (!curso) {
+    ui.alert('Por favor ingrese un ID de curso válido');
+    return;
+  }
+
+  const resultado = reporteCalificacionPorCurso(curso);
+
+  if (resultado.success === false) {
+    ui.alert(resultado.message);
+  } else {
+    ui.showSidebar(HtmlService.createHtmlOutput('✅ «Reporte_Calificaciones» generado').setWidth(200));
   }
 }
 
@@ -1767,20 +1817,220 @@ function compararCalificacionesCursos(cur1, cur2) {
 /**
  * FUNCIONES FALTANTES PARA EL DASHBOARD (stubs temporales)
  */
+/**
+ * Genera un reporte avanzado de asistencia con estadísticas globales
+ * Incluye resumen por curso y por estudiante
+ */
 function reporteAsistenciaAvanzada_UI() {
-  return { success: false, message: 'Función de reporte avanzado no implementada aún. Usa las opciones de reportes disponibles en el menú.' };
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const { headers, values } = getSheetData(ss, 'RegistroAsistencia');
+
+    if (!values || values.length === 0) {
+      ui.alert('No hay datos de asistencia para generar el reporte');
+      return { success: false, message: 'No hay datos disponibles' };
+    }
+
+    // Obtener índices de columnas
+    const iID = headers.indexOf('IDEstudiante');
+    const iCurso = headers.indexOf('CursoID');
+    const iPresente = headers.indexOf('Presente');
+    const iFecha = headers.indexOf('Fecha');
+
+    // Estadísticas globales
+    const totalRegistros = values.length;
+    const totalPresentes = values.filter(row => row[iPresente] === true).length;
+    const totalAusentes = totalRegistros - totalPresentes;
+    const porcentajeGlobal = ((totalPresentes / totalRegistros) * 100).toFixed(1);
+
+    // Estadísticas por estudiante
+    const estatudiantesMap = {};
+    values.forEach(row => {
+      const est = row[iID];
+      if (!estatudiantesMap[est]) {
+        estatudiantesMap[est] = { total: 0, presentes: 0 };
+      }
+      estatudiantesMap[est].total++;
+      if (row[iPresente] === true) estatudiantesMap[est].presentes++;
+    });
+
+    // Estadísticas por curso
+    const cursosMap = {};
+    values.forEach(row => {
+      const curso = row[iCurso];
+      if (!cursosMap[curso]) {
+        cursosMap[curso] = { total: 0, presentes: 0 };
+      }
+      cursosMap[curso].total++;
+      if (row[iPresente] === true) cursosMap[curso].presentes++;
+    });
+
+    // Crear hoja de reporte
+    let hoja = ss.getSheetByName('Reporte_Avanzado_Asistencia') || ss.insertSheet('Reporte_Avanzado_Asistencia');
+    hoja.clear();
+
+    // Preparar datos para escritura
+    const dataRows = [
+      ['=== REPORTE AVANZADO DE ASISTENCIA ==='],
+      [],
+      ['📊 ESTADÍSTICAS GLOBALES'],
+      ['Total de registros:', totalRegistros],
+      ['Total presentes:', totalPresentes],
+      ['Total ausentes:', totalAusentes],
+      ['Porcentaje de asistencia:', porcentajeGlobal + '%'],
+      [],
+      ['📚 ESTADÍSTICAS POR CURSO'],
+      ['Curso', 'Total Registros', 'Presentes', 'Ausentes', '% Asistencia']
+    ];
+
+    // Agregar datos por curso
+    Object.keys(cursosMap).sort().forEach(curso => {
+      const stats = cursosMap[curso];
+      const ausentes = stats.total - stats.presentes;
+      const pct = ((stats.presentes / stats.total) * 100).toFixed(1);
+      dataRows.push([curso, stats.total, stats.presentes, ausentes, pct + '%']);
+    });
+
+    dataRows.push([]);
+    dataRows.push(['👤 ESTADÍSTICAS POR ESTUDIANTE']);
+    dataRows.push(['Estudiante', 'Total Registros', 'Presentes', 'Ausentes', '% Asistencia']);
+
+    // Agregar datos por estudiante
+    Object.keys(estatudiantesMap).sort().forEach(est => {
+      const stats = estatudiantesMap[est];
+      const ausentes = stats.total - stats.presentes;
+      const pct = ((stats.presentes / stats.total) * 100).toFixed(1);
+      dataRows.push([est, stats.total, stats.presentes, ausentes, pct + '%']);
+    });
+
+    // Escribir todo de una vez
+    hoja.getRange(1, 1, dataRows.length, 5).setValues(dataRows);
+
+    // Formatear encabezados
+    hoja.getRange(1, 1).setFontWeight('bold').setFontSize(12);
+    hoja.getRange(3, 1).setFontWeight('bold');
+    hoja.getRange(9, 1).setFontWeight('bold');
+    hoja.getRange(9 + Object.keys(cursosMap).length + 2, 1).setFontWeight('bold');
+
+    // Autoajustar columnas
+    hoja.autoResizeColumns(1, 5);
+
+    ui.showSidebar(HtmlService.createHtmlOutput('✅ «Reporte_Avanzado_Asistencia» generado exitosamente').setWidth(250));
+    return { success: true, message: '✅ Reporte avanzado generado' };
+
+  } catch (error) {
+    Logger.log('Error en reporteAsistenciaAvanzada_UI: ' + error);
+    SpreadsheetApp.getUi().alert('Error al generar reporte: ' + error.message);
+    return { success: false, message: 'Error: ' + error.message };
+  }
 }
 
-function openSchedulerDialog() {
-  return { success: false, message: 'Función de programación de alertas no implementada aún. Esta función requiere configuración manual desde Google Sheets.' };
-}
-
-function openConfigDialog() {
-  return { success: false, message: 'Función de configuración no implementada aún. Esta función requiere configuración manual desde Google Sheets.' };
-}
-
+/**
+ * Diagnostica el estado del sistema de alertas de asistencia
+ * Muestra configuración, programaciones y triggers activos
+ */
 function diagnosticarSistemaAlertas() {
-  return { success: false, message: 'Función de diagnóstico no implementada aún. Esta función requiere configuración manual desde Google Sheets.' };
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    let diagnostico = [];
+
+    // 1. Verificar configuración
+    diagnostico.push('=== CONFIGURACIÓN ===');
+    const configSheet = ss.getSheetByName('ConfiguracionAlertas');
+    if (configSheet && configSheet.getLastRow() > 1) {
+      const config = configSheet.getRange(2, 1, 1, configSheet.getLastColumn()).getValues()[0];
+      diagnostico.push('✅ Configuración: ENCONTRADA');
+      diagnostico.push('  - Ventana de análisis: ' + (config[0] || 'No definida'));
+      diagnostico.push('  - Destinatarios: ' + (config[1] || 'No definidos'));
+      diagnostico.push('  - Análisis automático: ' + (config[2] ? 'ACTIVO' : 'INACTIVO'));
+    } else {
+      diagnostico.push('❌ Configuración: NO ENCONTRADA');
+      diagnostico.push('  → Configura el sistema desde: ⚙️ Automatización > ⚙️ Configurar alertas');
+    }
+
+    diagnostico.push('');
+
+    // 2. Verificar programaciones
+    diagnostico.push('=== PROGRAMACIONES ===');
+    const schedSheet = ss.getSheetByName('Scheduler');
+    if (schedSheet && schedSheet.getLastRow() > 1) {
+      const scheds = schedSheet.getRange(2, 1, schedSheet.getLastRow() - 1, 6).getValues();
+      const activos = scheds.filter(s => s[5] === 'Sí');
+      diagnostico.push('✅ Programaciones: ' + scheds.length + ' total(es)');
+      diagnostico.push('  - Activas: ' + activos.length);
+      if (activos.length > 0) {
+        activos.forEach(s => {
+          diagnostico.push('    • ' + s[1] + ' a las ' +
+                          ('0' + s[2]).slice(-2) + ':' + ('0' + s[3]).slice(-2));
+        });
+      }
+    } else {
+      diagnostico.push('❌ Programaciones: NINGUNA');
+      diagnostico.push('  → Programa alertas desde: ⚙️ Automatización > ⏰ Programar alertas');
+    }
+
+    diagnostico.push('');
+
+    // 3. Verificar triggers
+    diagnostico.push('=== TRIGGERS (disparadores) ===');
+    const triggers = ScriptApp.getProjectTriggers();
+    if (triggers.length > 0) {
+      diagnostico.push('✅ Triggers: ' + triggers.length + ' activo(s)');
+      triggers.forEach(t => {
+        const tipo = t.getEventType().toString();
+        const func = t.getHandlerFunction();
+        diagnostico.push('  - ' + func + ' (' + tipo + ')');
+      });
+    } else {
+      diagnostico.push('⚠️ Triggers: NINGUNO');
+      diagnostico.push('  → Los triggers se crean automáticamente al programar alertas');
+    }
+
+    diagnostico.push('');
+
+    // 4. Verificar datos de asistencia
+    diagnostico.push('=== DATOS DE ASISTENCIA ===');
+    const asistSheet = ss.getSheetByName('RegistroAsistencia');
+    if (asistSheet && asistSheet.getLastRow() > 1) {
+      const totalRegistros = asistSheet.getLastRow() - 1;
+      diagnostico.push('✅ Registros: ' + totalRegistros + ' total(es)');
+    } else {
+      diagnostico.push('❌ Registros: NINGUNO');
+      diagnostico.push('  → Registra asistencia para poder generar alertas');
+    }
+
+    diagnostico.push('');
+    diagnostico.push('=== ACCIONES DISPONIBLES ===');
+    diagnostico.push('• Configurar: ⚙️ Automatización > ⚙️ Configurar alertas');
+    diagnostico.push('• Programar: ⚙️ Automatización > ⏰ Programar alertas');
+    diagnostico.push('• Ejecutar manual: ⚙️ Automatización > ▶️ Ejecutar reporte AHORA');
+
+    // Crear hoja de diagnóstico
+    let hojaD = ss.getSheetByName('Diagnostico_Sistema') || ss.insertSheet('Diagnostico_Sistema');
+    hojaD.clear();
+
+    // Escribir diagnóstico
+    const dataRows = diagnostico.map(line => [line]);
+    hojaD.getRange(1, 1, dataRows.length, 1).setValues(dataRows);
+
+    // Formatear
+    hojaD.setColumnWidth(1, 600);
+    hojaD.getRange(1, 1, dataRows.length, 1).setWrap(true);
+
+    ui.showSidebar(HtmlService.createHtmlOutput(
+      '✅ Diagnóstico completado.<br><br>Revisa la hoja «Diagnostico_Sistema» para ver los resultados.'
+    ).setWidth(250));
+
+    return { success: true, message: '✅ Diagnóstico completado' };
+
+  } catch (error) {
+    Logger.log('Error en diagnosticarSistemaAlertas: ' + error);
+    SpreadsheetApp.getUi().alert('❌ Error al diagnosticar: ' + error.message);
+    return { success: false, message: 'Error: ' + error.message };
+  }
 }
 
 function checkAttendanceOnOpen() {
@@ -1788,31 +2038,8 @@ function checkAttendanceOnOpen() {
   Logger.log('checkAttendanceOnOpen: función stub');
 }
 
-function reporteNotasSituacion() {
-  try {
-    return {
-      success: false,
-      message: 'Esta función requiere interacción manual desde la hoja de cálculo. Por favor, abre el archivo en Google Sheets y ejecútala desde el menú "⚡ Funciones Extra > 📝 Calificaciones > 📄 Generar reporte de notas".'
-    };
-  } catch (error) {
-    return { success: false, message: 'Error: ' + error.message };
-  }
-}
-
-function calculaMediaPonderadaDesdeHoja() {
-  try {
-    return {
-      success: false,
-      message: 'Esta función requiere interacción manual desde la hoja de cálculo. Por favor, abre el archivo en Google Sheets y ejecútala desde el menú "⚡ Funciones Extra > 📝 Calificaciones > 🧮 Calcular medias ponderadas".'
-    };
-  } catch (error) {
-    return { success: false, message: 'Error: ' + error.message };
-  }
-}
-
 // ============================================================================
-// FUNCIONES ANTIGUAS SOLO PARA COMPATIBILIDAD CON MENÚS DE GOOGLE SHEETS
-// (No se usan desde la Web App)
+// FUNCIONES DIALOG PARA COMPATIBILIDAD CON MENÚS DE GOOGLE SHEETS
 // ============================================================================
 
 function compararEstudiantesDialog() {
