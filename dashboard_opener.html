@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+        max-width: 600px;
+      }
+      h2 {
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+      }
+      .btn {
+        display: inline-block;
+        padding: 1rem 2rem;
+        background: white;
+        color: #667eea;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: transform 0.2s;
+        margin: 0.5rem;
+        cursor: pointer;
+        border: none;
+        font-size: 1rem;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      }
+      .url-box {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        word-break: break-all;
+        font-size: 0.875rem;
+      }
+      .copy-btn {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        padding: 0.5rem 1rem;
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+      }
+      .copy-btn:hover {
+        background: rgba(255,255,255,0.3);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>🎯 Panel de Control de Evaluación</h2>
+      <p>El dashboard se está abriendo en una nueva ventana del navegador</p>
+      <a href="#" id="openBtn" class="btn">🚀 Abrir Dashboard</a>
+      <div class="url-box">
+        <strong>URL de acceso directo:</strong><br>
+        <span id="url">Cargando...</span><br>
+        <button class="copy-btn" onclick="copyUrl()">📋 Copiar URL</button>
+      </div>
+      <p style="margin-top: 1rem; font-size: 0.875rem; opacity: 0.9;">
+        💡 Guarda esta URL como marcador para acceder directamente al dashboard sin abrir Google Sheets
+      </p>
+    </div>
+
+    <script>
+      // URL hardcodeada de la Web App desplegada
+      const WEBAPP_URL = 'https://script.google.com/a/macros/scorazon.hhdc.net/s/AKfycbyor77XcBl2jqTVL8CndY9HZir9FKc06knR7MDMdrtz9dldmWilDJCbB0ItumBS27tnsQ/exec';
+
+      // Configurar la URL en la UI
+      document.getElementById('url').textContent = WEBAPP_URL;
+      document.getElementById('openBtn').href = WEBAPP_URL;
+
+      // Abrir automáticamente en nueva ventana
+      window.open(WEBAPP_URL, '_blank', 'width=1400,height=900');
+
+      // Función para copiar URL al portapapeles
+      function copyUrl() {
+        const url = document.getElementById('url').textContent;
+        if (url === 'Cargando...' || url.startsWith('Error')) {
+          alert('⚠️ URL no disponible aún');
+          return;
+        }
+
+        navigator.clipboard.writeText(url).then(() => {
+          alert('✅ URL copiada al portapapeles');
+        }).catch(() => {
+          // Fallback para navegadores antiguos
+          const textarea = document.createElement('textarea');
+          textarea.value = url;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          alert('✅ URL copiada al portapapeles');
+        });
+      }
+    </script>
+  </body>
+</html>

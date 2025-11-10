@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><?!= instrumentoNombre ?> – Calificación directa</title>
+  <style>
+    :root {
+      --brand-1: #667eea; /* Indigo */
+      --brand-2: #764ba2; /* Purple */
+      --text: #1f2937;    /* Gray-800 */
+      --muted: #6b7280;   /* Gray-500 */
+      --ok: #10b981;      /* Emerald */
+      --err: #ef4444;     /* Red */
+      --bg: #f3f4f6;      /* Gray-100 */
+      --card: #ffffff;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%);
+      color: var(--text);
+      display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .container { width: min(960px, 100%); background: var(--card); border-radius: 16px; box-shadow: 0 15px 40px rgba(0,0,0,.2); overflow: hidden; }
+    .header { padding: 20px 24px; border-bottom: 3px solid var(--brand-1); text-align: center; }
+    .title { margin: 0 0 6px; color: var(--brand-1); font-weight: 800; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 14px; }
+    .content { padding: 20px; display: grid; gap: 16px; }
+    .row { display: grid; gap: 12px; }
+    .field label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    .select, .input, .textarea {
+      width: 100%; font-size: 18px; padding: 14px 12px; border-radius: 12px; border: 2px solid #e5e7eb; outline: none;
+    }
+    .select:focus, .input:focus, .textarea:focus { border-color: var(--brand-1); box-shadow: 0 0 0 3px rgba(102,126,234,.15); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { padding: 12px 14px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-weight: 600; cursor: pointer; border: 2px solid transparent; user-select: none; touch-action: manipulation; min-width: 56px; text-align: center; }
+    .chip:active { transform: scale(.98); }
+    .chip[aria-pressed="true"] { background: #e0e7ff; border-color: var(--brand-1); }
+    .footer { position: sticky; bottom: 0; background: linear-gradient(180deg, rgba(255,255,255,.0), rgba(255,255,255,1) 12px); padding: 16px; border-top: 1px solid #e5e7eb; display: grid; gap: 12px; grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 640px) { .footer { grid-template-columns: 1fr; } }
+    .btn { font-size: 18px; font-weight: 700; padding: 14px 16px; border-radius: 12px; border: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-primary { background: linear-gradient(135deg, var(--brand-1), var(--brand-2)); color: #fff; }
+    .btn-ghost   { background: #eef2ff; color: #3730a3; }
+    .btn-danger  { background: #fee2e2; color: #b91c1c; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .help { color: var(--muted); font-size: 13px; }
+    .toast { position: fixed; right: 16px; bottom: 16px; background: #111827; color: #fff; padding: 12px 16px; border-radius: 12px; opacity: 0; transform: translateY(10px); pointer-events: none; transition: .25s; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: var(--ok); }
+    .toast.error   { background: var(--err); }
+    .badge { display:inline-flex; gap:8px; align-items:center; background:#111827; color:#fff; padding:4px 8px; border-radius:999px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="title">Calificación directa</h1>
+      <p class="subtitle">
+        Instrumento: <strong id="hdrInstrumento"><?!= instrumentoNombre ?></strong>
+        <span id="hdrCtx" style="margin-left:8px"></span>
+      </p>
+    </div>
+
+    <div class="content">
+      <div class="row field">
+        <label for="alumno">Alumno/a a calificar</label>
+        <select id="alumno" class="select" required></select>
+        <div class="help">Lista filtrada desde el servidor.</div>
+      </div>
+
+      <div class="row field">
+        <label for="nota">Nota (0–10)</label>
+        <div class="grid2">
+          <input id="nota" class="input" type="number" inputmode="decimal" min="0" max="10" step="0.25" placeholder="Ej. 7.5" required />
+          <div>
+            <div class="chips" id="chips"></div>
+            <div class="help">Toca una ficha para rellenar rápido. Ajusta decimales en el campo.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row field">
+        <label for="comentarios">Comentarios (opcional)</label>
+        <textarea id="comentarios" class="textarea" rows="4" placeholder="Observaciones breves"></textarea>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button id="btnGuardar" class="btn btn-primary">Guardar</button>
+      <button id="btnGuardarNuevo" class="btn btn-ghost">Guardar y nuevo</button>
+      <button id="btnReintentar" class="btn btn-danger" title="Recargar la página">Reiniciar</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Inyección SEGURA de datos del servidor -->
+  <script>
+    (function injectServerData(){
+      try {
+        window.SERVER = {
+          estudiantes: <?!= JSON.stringify(estudiantes) ?>,
+          instrumentoId: <?!= JSON.stringify(instrumentoID) ?>,
+          instrumentoNombre: <?!= JSON.stringify(instrumentoNombre) ?>,
+          cursoAsignado: <?!= JSON.stringify(typeof cursoAsignado !== 'undefined' ? cursoAsignado : '') ?>,
+          situacionAprendizaje: <?!= JSON.stringify(typeof situacionAprendizaje !== 'undefined' ? situacionAprendizaje : '') ?>
+        };
+      } catch (e) {
+        window.SERVER = { estudiantes: [], instrumentoId: '', instrumentoNombre: '', cursoAsignado: '', situacionAprendizaje: '' };
+      }
+      window.ESTUDIANTES = Array.isArray(window.SERVER.estudiantes) ? window.SERVER.estudiantes : [];
+      window.INSTRUMENTO_ID = typeof window.SERVER.instrumentoId === 'string' ? window.SERVER.instrumentoId : '';
+    })();
+  </script>
+
+  <script>
+    // TEST MODE: añade ?test=1 a la URL para mockear datos si vinieran vacíos
+    const TEST_MODE = new URLSearchParams(location.search).get('test') === '1';
+
+    const $ = (sel) => document.querySelector(sel);
+    const toast = (msg, type = "success") => {
+      const t = $('#toast');
+      t.textContent = msg; t.className = `toast ${type} show`;
+      setTimeout(() => t.classList.remove('show'), 2200);
+    };
+
+    function ensureTestData() {
+      if (!TEST_MODE) return;
+      if (!Array.isArray(window.ESTUDIANTES) || !window.ESTUDIANTES.length) {
+        window.ESTUDIANTES = [
+          { IDEstudiante: 'E001', NombreEstudiante: 'Ana Pérez',  CursoID: '4ESO-A' },
+          { IDEstudiante: 'E002', NombreEstudiante: 'Luis Gómez', CursoID: '4ESO-A' }
+        ];
+      }
+      if (!window.INSTRUMENTO_ID) window.INSTRUMENTO_ID = 'INST_NUM_TEST';
+      if (!window.SERVER.instrumentoNombre) window.SERVER.instrumentoNombre = 'Prueba – Nota directa';
+      const badge = document.createElement('span');
+      badge.className = 'badge'; badge.textContent = 'TEST MODE';
+      $('#hdrCtx').appendChild(badge);
+    }
+
+    function fillHeaderContext() {
+      const ctx = [];
+      if (window.SERVER.cursoAsignado) ctx.push('Curso: ' + window.SERVER.cursoAsignado);
+      if (window.SERVER.situacionAprendizaje) ctx.push('Situación: ' + window.SERVER.situacionAprendizaje);
+      $('#hdrInstrumento').textContent = window.SERVER.instrumentoNombre || 'Calificación directa';
+      $('#hdrCtx').innerHTML = ctx.length ? '· ' + ctx.map(x => `<strong>${x}</strong>`).join(' · ') : '';
+    }
+
+    function buildChips() {
+      const vals = [0,1,2,3,4,5,6,7,8,9,10];
+      const cont = $('#chips');
+      cont.innerHTML = '';
+      vals.forEach(v => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'chip'; b.textContent = String(v);
+        b.addEventListener('click', () => {
+          $('#nota').value = v;
+          document.querySelectorAll('.chip[aria-pressed="true"]').forEach(x => x.setAttribute('aria-pressed','false'));
+          b.setAttribute('aria-pressed','true');
+        });
+        cont.appendChild(b);
+      });
+    }
+
+    function fillStudents() {
+      const data = Array.isArray(window.ESTUDIANTES) ? window.ESTUDIANTES : [];
+      const sel = $('#alumno');
+      sel.innerHTML = '<option value="" disabled selected>Selecciona…</option>' +
+        data.map(e => `<option value="${e.IDEstudiante}">${e.NombreEstudiante} (${e.CursoID ?? ''})</option>`).join('');
+    }
+
+    function lockUI(lock) {
+      ['#btnGuardar', '#btnGuardarNuevo', '#btnReintentar', '#alumno', '#nota', '#comentarios']
+        .forEach(sel => { const el = $(sel); if (el) el.disabled = !!lock; });
+    }
+
+    function validate() {
+      const alumno = $('#alumno').value;
+      const notaStr = $('#nota').value.replace(',', '.');
+      const nota = Number(notaStr);
+      if (!alumno) return { ok: false, msg: 'Selecciona un alumno.' };
+      if (Number.isNaN(nota)) return { ok: false, msg: 'Introduce una nota válida.' };
+      if (nota < 0 || nota > 10) return { ok: false, msg: 'La nota debe estar entre 0 y 10.' };
+      return { ok: true, alumno, nota, comentarios: $('#comentarios').value.trim() };
+    }
+
+    // === NUEVO: avanzar al siguiente alumno al usar "Guardar y nuevo" ===
+    function selectNextStudent() {
+      const sel = $('#alumno');
+      const total = sel.options.length;
+      const idx = sel.selectedIndex; // actual
+      // siguiente opción no deshabilitada
+      for (let i = idx + 1; i < total; i++) {
+        if (!sel.options[i].disabled) { sel.selectedIndex = i; return true; }
+      }
+      // si no hay más, vuelve al primero seleccionable (índice 1)
+      for (let i = 1; i < total; i++) {
+        if (!sel.options[i].disabled) { sel.selectedIndex = i; return false; }
+      }
+      return false;
+    }
+    function resetInputsForNext() {
+      $('#nota').value = '';
+      $('#comentarios').value = '';
+      document.querySelectorAll('.chip[aria-pressed="true"]').forEach(x => x.setAttribute('aria-pressed','false'));
+      $('#nota').focus();
+    }
+
+    async function guardar({ resetAfter = false } = {}) {
+      const v = validate();
+      if (!v.ok) { toast(v.msg, 'error'); return; }
+      lockUI(true);
+      try {
+        await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(res => { if (res && res.success) resolve(res); else reject(new Error(res && res.message || 'Error desconocido')); })
+            .withFailureHandler(err => reject(err))
+            .recordNumericGrade({
+              instrumentoId: (window.INSTRUMENTO_ID || ''),
+              studentId: v.alumno,
+              grade: Number(v.nota),
+              comments: v.comentarios
+            });
+        });
+        toast('✅ Guardado');
+        if (resetAfter) {
+          const advanced = selectNextStudent();  // ← mueve al siguiente alumno
+          resetInputsForNext();                  // ← limpia campos
+          if (!advanced) toast('⚠ Último alumno — vuelto al primero', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        toast('❌ ' + (err.message || 'Fallo al guardar'), 'error');
+      } finally { lockUI(false); }
+    }
+
+    // Mini tests automáticos al cargar
+    function runSelfTests() {
+      const tests = [];
+      tests.push({ name: 'Tiene INSTRUMENTO_ID', pass: !!window.INSTRUMENTO_ID });
+      tests.push({ name: 'Lista ESTUDIANTES es array', pass: Array.isArray(window.ESTUDIANTES) });
+      tests.push({ name: 'recordNumericGrade accesible', pass: typeof google !== 'undefined' });
+      const allOk = tests.every(t => t.pass);
+      console.log('[num_directo_form] tests:', tests);
+      if (!allOk) toast('⚠ Ver consola: tests fallidos', 'error');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      ensureTestData();
+      fillHeaderContext();
+      fillStudents();
+      buildChips();
+
+      $('#btnGuardar').addEventListener('click', () => guardar({ resetAfter: false }));
+      $('#btnGuardarNuevo').addEventListener('click', () => guardar({ resetAfter: true }));
+      $('#btnReintentar').addEventListener('click', () => location.reload());
+
+      // Enter = guardar y nuevo (flujo rápido)
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (document.activeElement.id === 'nota' || document.activeElement.id === 'comentarios')) {
+          e.preventDefault(); guardar({ resetAfter: true });
+        }
+      });
+
+      runSelfTests();
+    });
+  </script>
+</body>
+</html>

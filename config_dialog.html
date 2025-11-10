@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 16px;
+      margin: 0;
+    }
+    h3 {
+      margin-top: 0;
+      color: #1a73e8;
+    }
+    label {
+      display: block;
+      margin: 12px 0 4px 0;
+      font-weight: 500;
+      color: #333;
+    }
+    input[type="number"],
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    .threshold-group {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 16px 0;
+    }
+    .threshold-group h4 {
+      margin: 0 0 8px 0;
+      color: #5f6368;
+      font-size: 14px;
+    }
+    .threshold-row {
+      display: flex;
+      gap: 12px;
+      margin: 8px 0;
+    }
+    .threshold-row > div {
+      flex: 1;
+    }
+    .threshold-row label {
+      margin: 0 0 4px 0;
+      font-size: 13px;
+    }
+    .threshold-row input {
+      width: 100%;
+    }
+    .buttons {
+      margin-top: 20px;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    button[type="submit"] {
+      background: #1a73e8;
+      color: white;
+    }
+    button[type="submit"]:hover {
+      background: #1557b0;
+    }
+    button[type="button"] {
+      background: #f1f3f4;
+      color: #5f6368;
+    }
+    button[type="button"]:hover {
+      background: #e8eaed;
+    }
+    .info {
+      background: #e8f0fe;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #1967d2;
+    }
+    small {
+      color: #5f6368;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h3>⚙️ Configuración de Alertas de Asistencia</h3>
+
+  <form id="configForm">
+    <label>
+      Ventana de análisis (días):
+      <input type="number" name="SesionesPrevistas"
+             value="<?= config.SesionesPrevistas || 30 ?>"
+             min="1" max="180" required>
+      <small>Número de días hacia atrás para calcular las métricas</small>
+    </label>
+
+    <label>
+      Destinatarios de email:
+      <input type="text" name="Destinatarios"
+             value="<?= config.Destinatarios || '' ?>"
+             placeholder="email1@ejemplo.com, email2@ejemplo.com" required>
+      <small>Separa múltiples destinatarios con comas</small>
+    </label>
+
+    <label style="display: flex; align-items: center; gap: 8px; margin: 16px 0;">
+      <input type="checkbox" name="AnalisisAutomaticoActivo"
+             value="true" <?= config.AnalisisAutomaticoActivo ? 'checked' : '' ?>>
+      <span><strong>Activar análisis automático al abrir la hoja</strong></span>
+    </label>
+    <small style="display: block; margin: -8px 0 16px 0; color: #666;">
+      Si está activado, el sistema detectará automáticamente estudiantes en riesgo cada vez que abras la hoja
+      y enviará un email (máximo 1 por día). Si está desactivado, los reportes solo se enviarán manualmente
+      o según la programación.
+    </small>
+
+    <div class="info">
+      Los umbrales se definen como porcentajes. Por ejemplo, si configuras 20% para ausencias
+      y la ventana es de 30 días, se alertará cuando un alumno tenga 6 o más ausencias.
+    </div>
+
+    <div class="threshold-group">
+      <h4>Ausencias (Aus)</h4>
+      <div class="threshold-row">
+        <div>
+          <label>Umbral aviso (%)</label>
+          <input type="number" name="Aus_%1"
+                 value="<?= config['Aus_%1'] || 20 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+        <div>
+          <label>Umbral grave (%)</label>
+          <input type="number" name="Aus_%2"
+                 value="<?= config['Aus_%2'] || 30 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="threshold-group">
+      <h4>Retrasos (Ret)</h4>
+      <div class="threshold-row">
+        <div>
+          <label>Umbral aviso (%)</label>
+          <input type="number" name="Ret_%1"
+                 value="<?= config['Ret_%1'] || 15 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+        <div>
+          <label>Umbral grave (%)</label>
+          <input type="number" name="Ret_%2"
+                 value="<?= config['Ret_%2'] || 25 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="threshold-group">
+      <h4>Sin uniforme (Uni)</h4>
+      <div class="threshold-row">
+        <div>
+          <label>Umbral aviso (%)</label>
+          <input type="number" name="Uni_%1"
+                 value="<?= config['Uni_%1'] || 10 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+        <div>
+          <label>Umbral grave (%)</label>
+          <input type="number" name="Uni_%2"
+                 value="<?= config['Uni_%2'] || 20 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="threshold-group">
+      <h4>Sin aseo (Ase)</h4>
+      <div class="threshold-row">
+        <div>
+          <label>Umbral aviso (%)</label>
+          <input type="number" name="Ase_%1"
+                 value="<?= config['Ase_%1'] || 10 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+        <div>
+          <label>Umbral grave (%)</label>
+          <input type="number" name="Ase_%2"
+                 value="<?= config['Ase_%2'] || 20 ?>"
+                 min="0" max="100" step="0.1" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button type="button" onclick="resetToDefaults()">Restaurar por defecto</button>
+      <button type="submit">Guardar</button>
+    </div>
+  </form>
+
+  <script>
+    document.getElementById('configForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const formData = {};
+      const form = e.target;
+
+      // Recoger todos los campos del formulario
+      for (let element of form.elements) {
+        if (element.name) {
+          // Manejar checkboxes especialmente
+          if (element.type === 'checkbox') {
+            formData[element.name] = element.checked;
+          } else {
+            formData[element.name] = element.value;
+          }
+        }
+      }
+
+      // Validar que el umbral de aviso sea menor que el grave
+      const items = ['Aus', 'Ret', 'Uni', 'Ase'];
+      for (const item of items) {
+        const p1 = parseFloat(formData[item + '_%1']);
+        const p2 = parseFloat(formData[item + '_%2']);
+        if (p1 > p2) {
+          alert(`Error: El umbral de aviso debe ser menor que el grave para ${item}`);
+          return;
+        }
+      }
+
+      // Enviar al servidor
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            alert('✅ ' + response.message);
+            google.script.host.close();
+          } else {
+            alert('❌ ' + response.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('❌ Error al guardar: ' + error.message);
+        })
+        .saveConfigFromDialog(formData);
+    });
+
+    function resetToDefaults() {
+      if (confirm('¿Restaurar todos los valores por defecto?')) {
+        document.querySelector('[name="SesionesPrevistas"]').value = 30;
+        document.querySelector('[name="Destinatarios"]').value = '';
+        document.querySelector('[name="Aus_%1"]').value = 20;
+        document.querySelector('[name="Aus_%2"]').value = 30;
+        document.querySelector('[name="Ret_%1"]').value = 15;
+        document.querySelector('[name="Ret_%2"]').value = 25;
+        document.querySelector('[name="Uni_%1"]').value = 10;
+        document.querySelector('[name="Uni_%2"]').value = 20;
+        document.querySelector('[name="Ase_%1"]').value = 10;
+        document.querySelector('[name="Ase_%2"]').value = 20;
+      }
+    }
+  </script>
+</body>
+</html>

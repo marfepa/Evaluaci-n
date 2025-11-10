@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <title>Rúbrica Peer – <?!= instrumentoNombre ?></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      margin: 0; 
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
+    }
+    .container { 
+      max-width: 95%; 
+      margin: 0 auto; 
+      background: #fff; 
+      padding: 30px; 
+      border-radius: 15px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid #667eea;
+    }
+    h1 { 
+      color: #667eea; 
+      margin-bottom: 10px;
+      font-size: 1.8em;
+    }
+    .evaluation-type {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      border-left: 4px solid #28a745;
+    }
+    .form-section {
+      margin-bottom: 25px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    label { 
+      font-weight: bold; 
+      display: block; 
+      margin-bottom: 8px; 
+      color: #495057;
+    }
+    select, textarea { 
+      width: 100%; 
+      padding: 12px; 
+      margin-bottom: 15px; 
+      border: 2px solid #dee2e6; 
+      border-radius: 8px; 
+      box-sizing: border-box;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+    }
+    .rubrica-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin: 25px 0;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .rubrica-table th { 
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 15px 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .rubrica-table td { 
+      border: 1px solid #dee2e6; 
+      padding: 15px; 
+      text-align: center;
+      vertical-align: top;
+    }
+    .criterio-cell { 
+      text-align: left !important; 
+      background: #e3f2fd;
+      font-weight: bold;
+      color: #1565c0;
+    }
+    .radio-container {
+      position: relative;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .radio-container:hover {
+      background-color: #f0f8ff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+    input[type="radio"] { 
+      display: none; 
+    }
+    input[type="radio"]:checked + .radio-label {
+      background: linear-gradient(135deg, #28a745, #20c997);
+      color: white;
+      transform: scale(1.02);
+    }
+    .radio-label {
+      display: block;
+      padding: 12px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+    .nivel-nombre {
+      font-weight: bold;
+      font-size: 1.1em;
+      margin-bottom: 8px;
+    }
+    .nivel-descriptor {
+      font-size: 0.9em;
+      margin: 8px 0;
+      line-height: 1.4;
+    }
+    .nivel-puntos {
+      font-weight: bold;
+      color: #007bff;
+      font-size: 1.1em;
+      margin-top: 8px;
+    }
+    .submit-section {
+      background: linear-gradient(135deg, #28a745, #20c997);
+      padding: 25px;
+      border-radius: 12px;
+      text-align: center;
+      margin-top: 30px;
+    }
+    .submit-button { 
+      background: white;
+      color: #28a745;
+      border: none; 
+      border-radius: 8px; 
+      padding: 15px 40px; 
+      font-size: 1.2em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .submit-button:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+    .submit-button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .feedback { 
+      margin-top: 20px; 
+      padding: 15px;
+      border-radius: 8px; 
+      font-weight: bold; 
+      text-align: center;
+      display: none;
+    }
+    .feedback.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .feedback.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><?!= instrumentoNombre ?></h1>
+      <? if (isAutoEvaluacion) { ?>
+        <div class="evaluation-type">
+          <h3>📝 Autoevaluación</h3>
+          <p>Te evaluarás a ti mismo/a según los criterios establecidos.</p>
+        </div>
+      <? } else if (isCoevaluacion) { ?>
+        <div class="evaluation-type">
+          <h3>👥 Coevaluación</h3>
+          <p>Evaluarás el desempeño de uno de tus compañeros/as.</p>
+        </div>
+      <? } else { ?>
+        <div class="evaluation-type">
+          <h3>🤝 Evaluación Peer</h3>
+          <p>Participarás en una evaluación entre pares.</p>
+        </div>
+      <? } ?>
+    </div>
+
+    <form id="rubricPeerForm">
+      <input type="hidden" name="instrumentoID" value="<?!= instrumentoID ?>">
+      <input type="hidden" name="evaluationType" value="<?!= isAutoEvaluacion ? 'auto' : (isCoevaluacion ? 'co' : 'peer') ?>">
+
+      <div class="form-section">
+        <label for="evaluadorSelect">¿Quién evalúa?</label>
+        <select id="evaluadorSelect" name="evaluadorId" required>
+          <option value="">-- Selecciona evaluador --</option>
+          <? estudiantes.forEach(function(s){ ?>
+           <option value="<?!= s.IDEstudiante ?>">
+             <?!= s.NombreEstudiante ?> (<?!= s.CursoID ?>)
+           </option>
+         <? }) ?>
+        </select>
+
+        <? if (!isAutoEvaluacion) { ?>
+          <label for="evaluadoSelect">¿A quién se evalúa?</label>
+          <select id="evaluadoSelect" name="evaluadoId" required>
+            <option value="">-- Selecciona evaluado --</option>
+            <? estudiantes.forEach(function(s){ ?>
+             <option value="<?!= s.IDEstudiante ?>">
+               <?!= s.NombreEstudiante ?> (<?!= s.CursoID ?>)
+             </option>
+           <? }) ?>
+          </select>
+        <? } ?>
+      </div>
+
+      <table class="rubrica-table">
+        <thead>
+          <tr>
+            <th>Criterio</th>
+            <? rubrica.niveles.forEach(function(n){ ?>
+              <th><?!= n.Nombre ?> <small>(<?!= n.Puntuacion ?> pts)</small></th>
+            <? }) ?>
+          </tr>
+        </thead>
+        <tbody>
+          <? rubrica.criterios.forEach(function(c){ ?>
+            <tr data-criterio-id="<?!= c.ID ?>">
+              <td class="criterio-cell"><?!= c.Nombre ?></td>
+              <? rubrica.niveles.forEach(function(n){
+                   const desc = c.DescriptoresPorNivel.find(d=>d.NivelID===n.ID) || {};
+              ?>
+                <td>
+                  <input type="radio"
+                         name="criterio_<?!= c.ID ?>"
+                         id="c_<?!= c.ID ?>_n_<?!= n.ID ?>"
+                         value="<?!= n.ID ?>"
+                         data-puntuacion="<?!= n.Puntuacion ?>"
+                         required>
+                  <label for="c_<?!= c.ID ?>_n_<?!= n.ID ?>" class="radio-label">
+                    <div class="nivel-nombre"><?!= n.Nombre ?></div>
+                    <? if (desc.Descriptor) { ?>
+                      <div class="nivel-descriptor"><?!= desc.Descriptor ?></div>
+                    <? } ?>
+                    <div class="nivel-puntos"><?!= n.Puntuacion ?> pts</div>
+                  </label>
+                </td>
+              <? }) ?>
+            </tr>
+          <? }) ?>
+        </tbody>
+      </table>
+
+      <div class="form-section">
+        <label for="comments">Comentarios de la evaluación:</label>
+        <textarea id="comments" name="comments" rows="4"></textarea>
+      </div>
+
+      <div class="submit-section">
+        <button type="button" id="saveBtn" class="submit-button">💾 Guardar Evaluación</button>
+      </div>
+    </form>
+
+    <div id="feedback" class="feedback"></div>
+  </div>
+
+  <script>
+    // Serializar criterios del servidor
+    const criteriosServer = <?!= JSON.stringify(rubrica.criterios) ?>;
+    document.getElementById('saveBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+
+      const evalSel = document.getElementById('evaluadorSelect');
+      if (!evalSel.value) {
+        alert('Selecciona quién evalúa.');
+        return;
+      }
+      let evaluadoId = evalSel.value;
+      <? if (!isAutoEvaluacion) { ?>
+        const evSel = document.getElementById('evaluadoSelect');
+        if (!evSel.value) {
+          alert('Selecciona quién es evaluado.');
+          return;
+        }
+        if (evSel.value === evalSel.value) {
+          alert('No puedes evaluarte a ti mismo en coevaluación.');
+          return;
+        }
+        evaluadoId = evSel.value;
+      <? } ?>
+
+      // Recolectar criterios con for…of
+      const criterios = [];
+      for (const c of criteriosServer) {
+        const radio = document.querySelector(`input[name="criterio_${c.ID}"]:checked`);
+        if (!radio) {
+          alert('Completa todos los criterios.');
+          return;
+        }
+        criterios.push({
+          criterioID: c.ID,
+          nivelID: radio.value,
+          puntuacion: parseFloat(radio.dataset.puntuacion)
+        });
+      }
+
+      const data = {
+        instrumentoID: document.querySelector('input[name="instrumentoID"]').value,
+        evaluationType: document.querySelector('input[name="evaluationType"]').value,
+        evaluadorId: evalSel.value,
+        evaluadoId: evaluadoId,
+        criterios: criterios,
+        rubricaMaxPuntuacionPosible: <?!= rubrica.maxPuntuacionPosible ?>,
+        comments: document.getElementById('comments').value || ''
+      };
+
+      const fb = document.getElementById('feedback');
+      const btn = document.getElementById('saveBtn');
+      fb.style.display = 'block';
+      fb.className = 'feedback';
+      fb.textContent = 'Guardando evaluación…';
+      btn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          alert(res.message);
+          fb.className = 'feedback success';
+          fb.textContent = res.message;
+          document.getElementById('rubricPeerForm').reset();
+          btn.disabled = false;
+        })
+        .withFailureHandler(function(err) {
+          fb.className = 'feedback error';
+          fb.textContent = 'Error: ' + err.message;
+          btn.disabled = false
+        })
+        .recordRubricaPeerGrade(data);
+    });
+  </script>
+</body>
+</html>

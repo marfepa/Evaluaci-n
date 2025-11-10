@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Beep Test - Evaluación por lotes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 15px;
+      margin-top: 30px;
+    }
+    h1 {
+      text-align: center;
+      color: #4a4a4a;
+    }
+    .sex-buttons, .level-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .sex-btn, .level-btn {
+      padding: 10px 15px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .sex-btn[aria-pressed="true"], .level-btn.active {
+      background: #667eea;
+      color: white;
+    }
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #667eea;
+      color: white;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      background: #667eea;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #5a67d8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Beep Test - Evaluación por lotes</h1>
+    <div class="sex-buttons">
+      <button id="sexM" class="sex-btn" aria-pressed="false">Chico</button>
+      <button id="sexF" class="sex-btn" aria-pressed="false">Chica</button>
+    </div>
+    <label>Alumno:</label>
+    <select id="student">
+      <option value="" disabled selected>Selecciona alumno...</option>
+    </select>
+    <label>Nivel:</label>
+    <div id="levelButtons" class="level-buttons"></div>
+    <button id="btnAdd">Añadir a lista</button>
+
+    <table id="tempTable">
+      <thead>
+        <tr>
+          <th>Alumno</th>
+          <th>Sexo</th>
+          <th>Nivel</th>
+          <th>Nota</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div style="text-align:center; margin-top:20px;">
+      <button id="btnGuardar">Guardar todo</button>
+    </div>
+  </div>
+
+  <script>
+    window.SERVER = {
+      instrumentoId: <?!= JSON.stringify(instrumentoID) ?>,
+      estudiantes: <?!= JSON.stringify(estudiantes) ?>
+    };
+
+    const scaleBoys  = {1:0.0, 5:4.0, 9:7.5, 11:9.0, 13:10.0};
+    const scaleGirls = {1:0.0, 4:4.5, 8:8.5, 10:9.5, 11:10.0};
+
+    function interpolate(scale, level){
+      const keys = Object.keys(scale).map(Number).sort((a,b)=>a-b);
+      if (level <= keys[0]) return scale[keys[0]];
+      if (level >= keys[keys.length-1]) return scale[keys[keys.length-1]];
+      for (let i=0; i<keys.length-1; i++){
+        const x0 = keys[i], x1 = keys[i+1];
+        if (level >= x0 && level <= x1){
+          const y0 = scale[x0], y1 = scale[x1];
+          return y0 + (y1 - y0) * ((level - x0) / (x1 - x0));
+        }
+      }
+      return scale[keys[keys.length-1]];
+    }
+
+    let selectedSex = "";
+    let selectedLevel = null;
+    let tempList = [];
+
+    document.getElementById("sexM").addEventListener("click", () => setSex("M"));
+    document.getElementById("sexF").addEventListener("click", () => setSex("F"));
+
+    function setSex(sex) {
+      selectedSex = sex;
+      document.getElementById("sexM").setAttribute("aria-pressed", sex==="M");
+      document.getElementById("sexF").setAttribute("aria-pressed", sex==="F");
+      fillStudents();
+    }
+
+    function fillStudents() {
+      const sel = document.getElementById("student");
+      sel.innerHTML = '<option value="" disabled selected>Selecciona alumno...</option>';
+
+      SERVER.estudiantes
+        .filter(e => e.Sexo === selectedSex)
+        .forEach(e => {
+          const opt = document.createElement("option");
+          opt.value = e.IDEstudiante;
+          const nombre = e.NombreEstudiante || e.Nombre || e.Alumno || "Sin nombre";
+          const curso = e.CursoID || "";
+          opt.textContent = curso ? `${nombre} (${curso})` : nombre;
+          sel.appendChild(opt);
+        });
+    }
+
+    function buildLevelButtons(){
+      const cont = document.getElementById("levelButtons");
+      cont.innerHTML = "";
+      for (let v=1; v<=13; v+=0.5){
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "level-btn";
+        btn.textContent = v.toString().replace('.', ',');
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".level-btn").forEach(b=>b.classList.remove("active"));
+          btn.classList.add("active");
+          selectedLevel = parseFloat(v.toFixed(1));
+        });
+        cont.appendChild(btn);
+      }
+    }
+    buildLevelButtons();
+
+    document.getElementById("btnAdd").addEventListener("click", () => {
+      const studentId = document.getElementById("student").value;
+      if (!studentId || !selectedLevel || !selectedSex) {
+        alert("Selecciona sexo, alumno y nivel");
+        return;
+      }
+      const student = SERVER.estudiantes.find(e => e.IDEstudiante === studentId);
+      const nota = interpolate(selectedSex === "M" ? scaleBoys : scaleGirls, selectedLevel);
+      const nombre = student.NombreEstudiante || student.Nombre || student.Alumno || "Sin nombre";
+
+      tempList.push({
+        studentId,
+        name: nombre,
+        sex: selectedSex,
+        level: selectedLevel,
+        grade: nota
+      });
+      renderTable();
+      document.getElementById("student").value = "";
+      document.querySelectorAll(".level-btn").forEach(b=>b.classList.remove("active"));
+      selectedLevel = null;
+    });
+
+    function renderTable(){
+      const tbody = document.querySelector("#tempTable tbody");
+      tbody.innerHTML = "";
+      tempList.forEach(item=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${item.name}</td><td>${item.sex}</td><td>${item.level}</td><td>${item.grade.toFixed(2)}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById("btnGuardar").addEventListener("click", () => {
+      if (tempList.length === 0) {
+        alert("No hay datos para guardar");
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(res => {
+          alert("Guardado correctamente");
+          tempList = [];
+          renderTable();
+        })
+        .withFailureHandler(err => alert("Error: " + err.message))
+        .recordNumericGradesBatch({
+          instrumentoId: SERVER.instrumentoId,
+          records: tempList.map(item => ({
+            studentId: item.studentId,
+            grade: item.grade
+          }))
+        });
+    });
+  </script>
+</body>
+</html>

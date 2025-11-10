@@ -1,0 +1,2448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Control - Sistema de Evaluación</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1e40af;
+      --primary-light: #3b82f6;
+      --secondary: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --border: #e2e8f0;
+      --shadow: rgba(0, 0, 0, 0.1);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 2rem 2rem 3rem;
+      box-shadow: 0 4px 6px -1px var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 300px;
+      height: 300px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-20px) rotate(10deg); }
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: -2rem auto 2rem;
+      padding: 0 1rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      background: var(--card-bg);
+      padding: 0.5rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px var(--shadow);
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 0.875rem 1.5rem;
+      border: none;
+      background: transparent;
+      color: var(--text-light);
+      cursor: pointer;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: var(--transition);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tab:hover {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .tab.active {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px var(--shadow);
+      transition: var(--transition);
+      border: 1px solid var(--border);
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .card-icon.primary { background: linear-gradient(135deg, var(--primary-light), var(--primary)); color: white; }
+    .card-icon.secondary { background: linear-gradient(135deg, #34d399, var(--secondary)); color: white; }
+    .card-icon.warning { background: linear-gradient(135deg, #fbbf24, var(--warning)); color: white; }
+    .card-icon.danger { background: linear-gradient(135deg, #f87171, var(--danger)); color: white; }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card-description {
+      color: var(--text-light);
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      text-decoration: none;
+      justify-content: center;
+      font-size: 0.9375rem;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--secondary);
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(37, 99, 235, 0.05);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: var(--text);
+      font-size: 0.9375rem;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9375rem;
+      transition: var(--transition);
+      background: white;
+      color: var(--text);
+    }
+
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border-left: 4px solid var(--primary);
+      box-shadow: 0 2px 8px var(--shadow);
+      transition: var(--transition);
+    }
+
+    .stat-card:hover {
+      transform: translateX(4px);
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+      color: var(--text-light);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .alert {
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: start;
+      gap: 0.75rem;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .alert-success {
+      background: #d1fae5;
+      color: #065f46;
+      border-left: 4px solid var(--secondary);
+    }
+
+    .alert-error {
+      background: #fee2e2;
+      color: #991b1b;
+      border-left: 4px solid var(--danger);
+    }
+
+    .alert-info {
+      background: #dbeafe;
+      color: #1e40af;
+      border-left: 4px solid var(--primary);
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px var(--shadow);
+      background: var(--card-bg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+    }
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    th {
+      background: var(--bg);
+      font-weight: 600;
+      color: var(--text);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      color: var(--text-light);
+    }
+
+    tr:hover {
+      background: var(--bg);
+    }
+
+    /* Attendance table specific styles */
+    #attendanceTable {
+      width: 100%;
+      table-layout: fixed;
+    }
+
+    #attendanceTable thead th {
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+    }
+
+    #attendanceStudentsTable tr {
+      display: table-row;
+    }
+
+    #attendanceStudentsTable td {
+      display: table-cell;
+      vertical-align: middle;
+      padding: 0.75rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #attendanceStudentsTable td:first-child {
+      text-align: left;
+      padding: 0.75rem;
+    }
+
+    #attendanceStudentsTable input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      accent-color: var(--primary);
+      margin: 0 auto;
+      display: block;
+    }
+
+    #attendanceStudentsTable input[type="checkbox"]:hover {
+      transform: scale(1.15);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.375rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .badge-primary { background: rgba(37, 99, 235, 0.1); color: var(--primary); }
+    .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--secondary); }
+    .badge-warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+    .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-light);
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border-radius: 16px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: scaleIn 0.3s ease-out;
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .modal-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-light);
+      transition: var(--transition);
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+
+    .modal-close:hover {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+    }
+
+    .modal-footer {
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 1.5rem;
+      }
+
+      .container {
+        margin-top: -1rem;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tabs {
+        overflow-x: auto;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
+      }
+    }
+
+    .pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: .5;
+      }
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s ease-in-out infinite;
+      border-radius: 4px;
+    }
+
+    @keyframes loading {
+      0% {
+        background-position: 200% 0;
+      }
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem;
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      accent-color: var(--primary);
+      border-radius: 4px;
+    }
+
+    .checkbox-wrapper input[type="checkbox"]:hover {
+      transform: scale(1.1);
+      transition: transform 0.2s ease;
+    }
+
+    .student-row {
+      transition: var(--transition);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .student-row:hover {
+      background: rgba(37, 99, 235, 0.02) !important;
+    }
+
+    .student-row.present {
+      background: rgba(16, 185, 129, 0.08);
+      border-left: 3px solid var(--secondary);
+    }
+
+    .student-row.present:hover {
+      background: rgba(16, 185, 129, 0.12) !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Panel de Control de Evaluación</h1>
+    <p>Sistema integral de gestión educativa</p>
+  </div>
+
+  <div class="container">
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">📈 Resumen</button>
+      <button class="tab" data-tab="students">👥 Estudiantes</button>
+      <button class="tab" data-tab="attendance">📋 Asistencia</button>
+      <button class="tab" data-tab="grades">📝 Calificaciones</button>
+      <button class="tab" data-tab="instruments">🎯 Instrumentos</button>
+      <button class="tab" data-tab="reports">📊 Reportes</button>
+    </div>
+
+    <!-- Overview Tab -->
+    <div id="overview" class="tab-content active">
+      <div class="stats-container" id="statsContainer">
+        <div class="stat-card">
+          <div class="stat-value" id="totalStudents">0</div>
+          <div class="stat-label">Estudiantes</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--secondary);">
+          <div class="stat-value" style="color: var(--secondary);" id="totalCourses">0</div>
+          <div class="stat-label">Cursos</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--warning);">
+          <div class="stat-value" style="color: var(--warning);" id="totalInstruments">0</div>
+          <div class="stat-label">Instrumentos</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--danger);">
+          <div class="stat-value" style="color: var(--danger);" id="totalGrades">0</div>
+          <div class="stat-label">Evaluaciones</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon primary">👥</div>
+            <div>
+              <div class="card-title">Gestión de Estudiantes</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Administra la información de los estudiantes, cursos y grupos.
+          </div>
+          <button class="btn btn-primary" onclick="switchTab('students')">
+            Ver Estudiantes →
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon secondary">📋</div>
+            <div>
+              <div class="card-title">Control de Asistencia</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Registra y consulta la asistencia de los estudiantes.
+          </div>
+          <button class="btn btn-secondary" onclick="switchTab('attendance')">
+            Ver Asistencia →
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon warning">📝</div>
+            <div>
+              <div class="card-title">Calificaciones</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Consulta y analiza las calificaciones de los estudiantes.
+          </div>
+          <button class="btn btn-outline" onclick="switchTab('grades')">
+            Ver Calificaciones →
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon danger">🎯</div>
+            <div>
+              <div class="card-title">Instrumentos de Evaluación</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Gestiona rúbricas, listas de cotejo y otros instrumentos.
+          </div>
+          <button class="btn btn-outline" onclick="switchTab('instruments')">
+            Ver Instrumentos →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Students Tab -->
+    <div id="students" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon primary">👥</div>
+          <div>
+            <div class="card-title">Estudiantes Registrados</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Filtrar por curso</label>
+          <select class="form-select" id="studentCourseFilter" onchange="loadStudents()">
+            <option value="">Todos los cursos</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Curso</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTable">
+              <tr>
+                <td colspan="4">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">👤</div>
+                    <div>Cargando estudiantes...</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Tab -->
+    <div id="attendance" class="tab-content">
+      <!-- Quick Attendance Registration -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <div class="card-icon primary">✏️</div>
+          <div>
+            <div class="card-title">Registrar Asistencia Rápida</div>
+          </div>
+        </div>
+        <div class="card-description">
+          Registro rápido de asistencia para un curso.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-input" id="attendanceDate" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Curso</label>
+          <select class="form-select" id="attendanceCourseSelect" onchange="loadStudentsForAttendance()" required>
+            <option value="">Selecciona un curso...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Colegio</label>
+          <select class="form-select" id="attendanceSchoolSelect" required>
+            <option value="">Selecciona un colegio...</option>
+          </select>
+        </div>
+
+        <div id="attendanceStudentsList" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <label class="form-label" style="margin-bottom: 0;">Estudiantes</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="markAllPresent()">
+                ✓ Todos Presentes
+              </button>
+              <button class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="clearAllAttendance()">
+                ✗ Limpiar Todo
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+            <table id="attendanceTable" style="width: 100%; table-layout: fixed; border-collapse: collapse;">
+              <thead style="position: sticky; top: 0; background: var(--bg); z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <tr>
+                  <th style="width: 40%; text-align: left; padding: 1rem; border-bottom: 2px solid var(--border);">Estudiante</th>
+                  <th style="width: 15%; text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">Presente</th>
+                  <th style="width: 15%; text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">Retraso</th>
+                  <th style="width: 15%; text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">Sin Uniforme</th>
+                  <th style="width: 15%; text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">Sin Aseo</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceStudentsTable">
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
+            <button class="btn btn-primary" onclick="saveAttendanceBatch()">
+              💾 Guardar Asistencia
+            </button>
+            <button class="btn btn-outline" onclick="cancelAttendanceRegistration()">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Attendance Records -->
+      <div class="card" style="margin-bottom: 1.5rem; display: none;" id="recentAttendanceCard">
+        <div class="card-header">
+          <div class="card-icon secondary">📋</div>
+          <div>
+            <div class="card-title">Registros Recientes</div>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Estudiante</th>
+                <th>Curso</th>
+                <th>Presente</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody id="recentAttendanceTable">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <div>No hay registros recientes</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Attendance Reports -->
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon secondary">📊</div>
+            <div>
+              <div class="card-title">Reporte por Estudiante</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Genera un reporte detallado de asistencia individual.
+          </div>
+          <button class="btn btn-primary" onclick="showAttendanceStudentModal()">
+            Generar Reporte
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon secondary">📚</div>
+            <div>
+              <div class="card-title">Reporte por Curso</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Visualiza la asistencia completa de un curso.
+          </div>
+          <button class="btn btn-primary" onclick="showAttendanceCourseModal()">
+            Generar Reporte
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon warning">🔄</div>
+            <div>
+              <div class="card-title">Comparar Estudiantes</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Compara la asistencia entre dos estudiantes.
+          </div>
+          <button class="btn btn-secondary" onclick="compareStudents()">
+            Comparar
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon warning">🔄</div>
+            <div>
+              <div class="card-title">Comparar Cursos</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Compara la asistencia entre dos cursos.
+          </div>
+          <button class="btn btn-secondary" onclick="compareCourses()">
+            Comparar
+          </button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header">
+          <div class="card-icon danger">🔔</div>
+          <div>
+            <div class="card-title">Automatización de Alertas</div>
+          </div>
+        </div>
+        <div class="card-description">
+          Configura alertas automáticas por email sobre asistencia.
+        </div>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button class="btn btn-outline" onclick="openSchedulerDialog()">
+            ⏰ Programar Alertas
+          </button>
+          <button class="btn btn-outline" onclick="openConfigDialog()">
+            ⚙️ Configurar Alertas
+          </button>
+          <button class="btn btn-outline" onclick="diagnosticarSistema()">
+            🔍 Diagnosticar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grades Tab -->
+    <div id="grades" class="tab-content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon primary">👤</div>
+            <div>
+              <div class="card-title">Calificaciones por Estudiante</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Consulta todas las calificaciones de un estudiante.
+          </div>
+          <button class="btn btn-primary" onclick="showGradesStudentModal()">
+            Ver Calificaciones
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon primary">📚</div>
+            <div>
+              <div class="card-title">Calificaciones por Curso</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Visualiza todas las calificaciones de un curso.
+          </div>
+          <button class="btn btn-primary" onclick="showGradesCourseModal()">
+            Ver Calificaciones
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon secondary">🔄</div>
+            <div>
+              <div class="card-title">Comparar Estudiantes</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Compara calificaciones entre dos estudiantes.
+          </div>
+          <button class="btn btn-secondary" onclick="compareGradesStudents()">
+            Comparar
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon secondary">🔄</div>
+            <div>
+              <div class="card-title">Comparar Cursos</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Compara calificaciones entre dos cursos.
+          </div>
+          <button class="btn btn-secondary" onclick="compareGradesCourses()">
+            Comparar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instruments Tab -->
+    <div id="instruments" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <div class="card-icon warning">🎯</div>
+          <div>
+            <div class="card-title">Instrumentos de Evaluación</div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Situación</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="instrumentsTable">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">🎯</div>
+                    <div>Cargando instrumentos...</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reports Tab -->
+    <div id="reports" class="tab-content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon primary">📄</div>
+            <div>
+              <div class="card-title">Reporte de Notas por Situación</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Genera un informe detallado de calificaciones por situación de aprendizaje.
+          </div>
+          <button class="btn btn-primary" onclick="generateSituationReport()">
+            Generar Reporte
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon secondary">📊</div>
+            <div>
+              <div class="card-title">Reporte Avanzado de Asistencia</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Análisis avanzado con múltiples filtros y opciones.
+          </div>
+          <button class="btn btn-secondary" onclick="generateAdvancedAttendanceReport()">
+            Generar Reporte
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon warning">🧮</div>
+            <div>
+              <div class="card-title">Calcular Medias Ponderadas</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Asigna pesos a instrumentos y calcula la media ponderada.
+          </div>
+          <button class="btn btn-outline" onclick="calculateWeightedAverage()">
+            Calcular
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon danger">📈</div>
+            <div>
+              <div class="card-title">Exportar Datos</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Exporta reportes y datos en diferentes formatos.
+          </div>
+          <button class="btn btn-outline" onclick="exportData()">
+            Exportar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Student Selection -->
+  <div id="studentModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="studentModalTitle">Seleccionar Estudiante</h3>
+        <button class="modal-close" onclick="closeModal('studentModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">ID del Estudiante</label>
+          <input type="text" class="form-input" id="studentIdInput" placeholder="Ingresa el ID del estudiante">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('studentModal')">Cancelar</button>
+        <button class="btn btn-primary" id="studentModalConfirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Course Selection -->
+  <div id="courseModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="courseModalTitle">Seleccionar Curso</h3>
+        <button class="modal-close" onclick="closeModal('courseModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">ID del Curso</label>
+          <input type="text" class="form-input" id="courseIdInput" placeholder="Ingresa el ID del curso">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('courseModal')">Cancelar</button>
+        <button class="btn btn-primary" id="courseModalConfirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Comparison -->
+  <div id="comparisonModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="comparisonModalTitle">Comparar</h3>
+        <button class="modal-close" onclick="closeModal('comparisonModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" id="comparisonLabel1">Primer ID</label>
+          <input type="text" class="form-input" id="comparisonInput1" placeholder="Ingresa el primer ID">
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="comparisonLabel2">Segundo ID</label>
+          <input type="text" class="form-input" id="comparisonInput2" placeholder="Ingresa el segundo ID">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('comparisonModal')">Cancelar</button>
+        <button class="btn btn-primary" id="comparisonModalConfirm">Comparar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Report Results -->
+  <div id="reportResultsModal" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="reportResultsTitle">Resultados del Reporte</h3>
+        <button class="modal-close" onclick="closeModal('reportResultsModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="reportResultsBody">
+        <!-- Results will be inserted here -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('reportResultsModal')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================================
+    // CONTEXT DETECTION AND API WRAPPER
+    // ============================================================================
+
+    // Detect if running in modal (google.script.run available) or web app mode
+    const isModalMode = typeof google !== 'undefined' && google.script && google.script.run;
+    const isWebAppMode = !isModalMode;
+
+    // Store webapp URL if in web app mode
+    let webAppUrl = window.location.origin + window.location.pathname;
+
+    console.log('Dashboard Mode:', isModalMode ? 'Modal Dialog' : 'Web App');
+
+    /**
+     * Universal API call wrapper that works in both modal and web app modes
+     * @param {string} functionName - Backend function name to call
+     * @param {Array} args - Arguments to pass to the function
+     * @returns {Promise} - Promise that resolves with the response
+     */
+    function callBackend(functionName, ...args) {
+      return new Promise((resolve, reject) => {
+        if (isModalMode) {
+          // Modal mode: use google.script.run
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            [functionName](...args);
+        } else {
+          // Web app mode: use fetch to call the backend
+          fetch(webAppUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              function: functionName,
+              arguments: args
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.error) {
+              reject(new Error(data.error));
+            } else {
+              resolve(data.result);
+            }
+          })
+          .catch(reject);
+        }
+      });
+    }
+
+    /**
+     * Show loading overlay
+     */
+    function showLoading(message = 'Cargando...') {
+      let overlay = document.getElementById('loadingOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.7);
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          color: white;
+          font-size: 1.2rem;
+        `;
+        overlay.innerHTML = `
+          <div class="loading" style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white;"></div>
+          <div style="margin-top: 1rem;" id="loadingMessage">${message}</div>
+        `;
+        document.body.appendChild(overlay);
+      } else {
+        overlay.style.display = 'flex';
+        document.getElementById('loadingMessage').textContent = message;
+      }
+    }
+
+    /**
+     * Hide loading overlay
+     */
+    function hideLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+    }
+
+    /**
+     * Show user-friendly error message
+     */
+    function showError(message, details = '') {
+      hideLoading();
+      const errorHtml = `
+        <div class="alert alert-error" style="margin: 1rem;">
+          <div style="font-weight: 600;">❌ Error</div>
+          <div>${message}</div>
+          ${details ? `<div style="font-size: 0.875rem; margin-top: 0.5rem; opacity: 0.8;">${details}</div>` : ''}
+        </div>
+      `;
+
+      // Try to show in current tab content
+      const activeTab = document.querySelector('.tab-content.active');
+      if (activeTab) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = errorHtml;
+        activeTab.insertBefore(tempDiv.firstElementChild, activeTab.firstChild);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => tempDiv.firstElementChild?.remove(), 5000);
+      } else {
+        alert(message + (details ? '\n\n' + details : ''));
+      }
+    }
+
+    /**
+     * Show success message
+     */
+    function showSuccess(message) {
+      hideLoading();
+      const successHtml = `
+        <div class="alert alert-success" style="margin: 1rem;">
+          <div>✅ ${message}</div>
+        </div>
+      `;
+
+      const activeTab = document.querySelector('.tab-content.active');
+      if (activeTab) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = successHtml;
+        activeTab.insertBefore(tempDiv.firstElementChild, activeTab.firstChild);
+
+        // Auto-remove after 3 seconds
+        setTimeout(() => tempDiv.firstElementChild?.remove(), 3000);
+      } else {
+        alert('✅ ' + message);
+      }
+    }
+
+    /**
+     * Show report results in modal
+     */
+    function showReportResults(title, data) {
+      document.getElementById('reportResultsTitle').textContent = title;
+      const body = document.getElementById('reportResultsBody');
+
+      if (Array.isArray(data)) {
+        // Display as table
+        if (data.length === 0) {
+          body.innerHTML = '<div class="alert alert-info">No hay datos para mostrar</div>';
+        } else {
+          const keys = Object.keys(data[0]);
+          body.innerHTML = `
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    ${keys.map(k => `<th>${k}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.map(row => `
+                    <tr>
+                      ${keys.map(k => `<td>${row[k] !== null && row[k] !== undefined ? row[k] : '-'}</td>`).join('')}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      } else if (typeof data === 'object') {
+        // Display as key-value pairs
+        body.innerHTML = `
+          <div class="table-container">
+            <table>
+              <tbody>
+                ${Object.entries(data).map(([key, value]) => `
+                  <tr>
+                    <th style="width: 40%; text-align: left;">${key}</th>
+                    <td>${value !== null && value !== undefined ? value : '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        body.innerHTML = `<div class="alert alert-info">${data}</div>`;
+      }
+
+      showModal('reportResultsModal');
+    }
+
+    // ============================================================================
+    // TAB MANAGEMENT
+    // ============================================================================
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabId = tab.dataset.tab;
+        switchTab(tabId);
+      });
+    });
+
+    function switchTab(tabId) {
+      // Update tabs
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+
+      // Update content
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+
+      // Load data for the tab
+      loadTabData(tabId);
+    }
+
+    function loadTabData(tabId) {
+      switch(tabId) {
+        case 'overview':
+          loadStats();
+          break;
+        case 'students':
+          loadStudents();
+          loadCourses();
+          break;
+        case 'attendance':
+          // Set today's date
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('attendanceDate').value = today;
+          // Load dropdowns
+          loadAttendanceDropdowns();
+          loadRecentAttendance();
+          break;
+        case 'instruments':
+          loadInstruments();
+          break;
+      }
+    }
+
+    // ============================================================================
+    // DATA LOADING FUNCTIONS
+    // ============================================================================
+
+    // Load statistics
+    async function loadStats() {
+      try {
+        const data = await callBackend('getStatistics');
+        document.getElementById('totalStudents').textContent = data.students || 0;
+        document.getElementById('totalCourses').textContent = data.courses || 0;
+        document.getElementById('totalInstruments').textContent = data.instruments || 0;
+        document.getElementById('totalGrades').textContent = data.grades || 0;
+      } catch (err) {
+        console.error('Error loading stats:', err);
+        showError('Error al cargar estadísticas', err.message);
+      }
+    }
+
+    // Load students
+    async function loadStudents() {
+      const courseFilter = document.getElementById('studentCourseFilter').value;
+      const tbody = document.getElementById('studentsTable');
+
+      tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="loading"></div><div>Cargando...</div></div></td></tr>';
+
+      try {
+        const students = await callBackend('getEstudiantesData');
+
+        if (!students || students.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">👤</div><div>No hay estudiantes registrados</div></div></td></tr>';
+          return;
+        }
+
+        let filtered = students;
+        if (courseFilter) {
+          filtered = students.filter(s => s.CursoID === courseFilter);
+        }
+
+        tbody.innerHTML = filtered.map(student => `
+          <tr>
+            <td>${student.IDEstudiante || '-'}</td>
+            <td>${student.NombreEstudiante || '-'}</td>
+            <td><span class="badge badge-primary">${student.CursoID || '-'}</span></td>
+            <td>${student.Email || '-'}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Error loading students:', err);
+        tbody.innerHTML = '<tr><td colspan="4"><div class="alert alert-error">Error al cargar estudiantes</div></td></tr>';
+      }
+    }
+
+    // Load courses for filter
+    async function loadCourses() {
+      try {
+        const courses = await callBackend('getCourses');
+        const select = document.getElementById('studentCourseFilter');
+        const current = select.value;
+        select.innerHTML = '<option value="">Todos los cursos</option>' +
+          courses.map(c => `<option value="${c}">${c}</option>`).join('');
+        select.value = current;
+      } catch (err) {
+        console.error('Error loading courses:', err);
+      }
+    }
+
+    // Load instruments
+    async function loadInstruments() {
+      const tbody = document.getElementById('instrumentsTable');
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="loading"></div><div>Cargando...</div></div></td></tr>';
+
+      try {
+        const instruments = await callBackend('getInstrumentosData');
+
+        if (!instruments || instruments.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🎯</div><div>No hay instrumentos registrados</div></div></td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = instruments.map(inst => `
+          <tr>
+            <td>${inst.IDInstrumento || '-'}</td>
+            <td>${inst.NombreInstrumento || '-'}</td>
+            <td><span class="badge badge-warning">${inst.TipoInstrumento || '-'}</span></td>
+            <td>${inst.Situacion || '-'}</td>
+            <td>
+              <button class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;"
+                      onclick="openInstrument('${inst.IDInstrumento}')">
+                Abrir
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Error loading instruments:', err);
+        tbody.innerHTML = '<tr><td colspan="5"><div class="alert alert-error">Error al cargar instrumentos</div></td></tr>';
+      }
+    }
+
+    // ============================================================================
+    // MODAL FUNCTIONS
+    // ============================================================================
+
+    function showModal(modalId) {
+      document.getElementById(modalId).classList.add('active');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+      // Clear any error messages in modal
+      const modal = document.getElementById(modalId);
+      const errorMessages = modal.querySelectorAll('.alert-error');
+      errorMessages.forEach(msg => msg.remove());
+    }
+
+    /**
+     * Validate student ID input
+     */
+    function validateStudentId(studentId) {
+      if (!studentId || studentId.trim() === '') {
+        return { valid: false, error: 'Por favor ingresa un ID de estudiante' };
+      }
+      // Add more validation rules as needed
+      return { valid: true };
+    }
+
+    /**
+     * Validate course ID input
+     */
+    function validateCourseId(courseId) {
+      if (!courseId || courseId.trim() === '') {
+        return { valid: false, error: 'Por favor ingresa un ID de curso' };
+      }
+      // Add more validation rules as needed
+      return { valid: true };
+    }
+
+    // ============================================================================
+    // ATTENDANCE FUNCTIONS
+    // ============================================================================
+
+    function showAttendanceStudentModal() {
+      document.getElementById('studentModalTitle').textContent = 'Reporte de Asistencia - Estudiante';
+      document.getElementById('studentIdInput').value = '';
+
+      document.getElementById('studentModalConfirm').onclick = async () => {
+        const studentId = document.getElementById('studentIdInput').value.trim();
+        const validation = validateStudentId(studentId);
+
+        if (!validation.valid) {
+          showError(validation.error);
+          return;
+        }
+
+        closeModal('studentModal');
+        showLoading('Generando reporte de asistencia...');
+
+        try {
+          const response = await callBackend('reportePorEstudiante', studentId);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Reporte de Asistencia - Estudiante ${studentId}`, response.data);
+              showSuccess(response.message || 'Reporte generado exitosamente');
+            } else {
+              showSuccess(response.message || 'Reporte generado y guardado en hoja');
+            }
+          } else {
+            showError(response?.message || 'Error al generar reporte');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al generar reporte', err.message);
+        }
+      };
+
+      showModal('studentModal');
+    }
+
+    function showAttendanceCourseModal() {
+      document.getElementById('courseModalTitle').textContent = 'Reporte de Asistencia - Curso';
+      document.getElementById('courseIdInput').value = '';
+
+      document.getElementById('courseModalConfirm').onclick = async () => {
+        const courseId = document.getElementById('courseIdInput').value.trim();
+        const validation = validateCourseId(courseId);
+
+        if (!validation.valid) {
+          showError(validation.error);
+          return;
+        }
+
+        closeModal('courseModal');
+        showLoading('Generando reporte de asistencia del curso...');
+
+        try {
+          const response = await callBackend('reportePorCurso', courseId);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Reporte de Asistencia - Curso ${courseId}`, response.data);
+              showSuccess(response.message || 'Reporte generado exitosamente');
+            } else {
+              showSuccess(response.message || 'Reporte generado y guardado en hoja');
+            }
+          } else {
+            showError(response?.message || 'Error al generar reporte');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al generar reporte', err.message);
+        }
+      };
+
+      showModal('courseModal');
+    }
+
+    function compareStudents() {
+      document.getElementById('comparisonModalTitle').textContent = 'Comparar Asistencia - Estudiantes';
+      document.getElementById('comparisonLabel1').textContent = 'ID del primer estudiante';
+      document.getElementById('comparisonLabel2').textContent = 'ID del segundo estudiante';
+      document.getElementById('comparisonInput1').value = '';
+      document.getElementById('comparisonInput2').value = '';
+
+      document.getElementById('comparisonModalConfirm').onclick = async () => {
+        const est1 = document.getElementById('comparisonInput1').value.trim();
+        const est2 = document.getElementById('comparisonInput2').value.trim();
+
+        if (!est1 || !est2) {
+          showError('Por favor ingresa ambos IDs de estudiantes');
+          return;
+        }
+
+        closeModal('comparisonModal');
+        showLoading('Comparando estudiantes...');
+
+        try {
+          const response = await callBackend('compararEstudiantes', est1, est2);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Comparación de Asistencia: ${est1} vs ${est2}`, response.data);
+              showSuccess(response.message || 'Comparación completada');
+            } else {
+              showSuccess(response.message || 'Comparación completada y guardada en hoja');
+            }
+          } else {
+            showError(response?.message || 'Error al comparar estudiantes');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al comparar estudiantes', err.message);
+        }
+      };
+
+      showModal('comparisonModal');
+    }
+
+    function compareCourses() {
+      document.getElementById('comparisonModalTitle').textContent = 'Comparar Asistencia - Cursos';
+      document.getElementById('comparisonLabel1').textContent = 'ID del primer curso';
+      document.getElementById('comparisonLabel2').textContent = 'ID del segundo curso';
+      document.getElementById('comparisonInput1').value = '';
+      document.getElementById('comparisonInput2').value = '';
+
+      document.getElementById('comparisonModalConfirm').onclick = async () => {
+        const cur1 = document.getElementById('comparisonInput1').value.trim();
+        const cur2 = document.getElementById('comparisonInput2').value.trim();
+
+        if (!cur1 || !cur2) {
+          showError('Por favor ingresa ambos IDs de cursos');
+          return;
+        }
+
+        closeModal('comparisonModal');
+        showLoading('Comparando cursos...');
+
+        try {
+          const response = await callBackend('compararCursos', cur1, cur2);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Comparación de Asistencia: ${cur1} vs ${cur2}`, response.data);
+              showSuccess(response.message || 'Comparación completada');
+            } else {
+              showSuccess(response.message || 'Comparación completada y guardada en hoja');
+            }
+          } else {
+            showError(response?.message || 'Error al comparar cursos');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al comparar cursos', err.message);
+        }
+      };
+
+      showModal('comparisonModal');
+    }
+
+    async function openSchedulerDialog() {
+      showLoading('Cargando programador de alertas...');
+      try {
+        const response = await callBackend('openSchedulerDialog');
+        hideLoading();
+
+        if (response && response.html) {
+          // If response contains HTML, we need to handle it differently
+          showError('Funcionalidad de programador próximamente en el dashboard');
+        } else {
+          showSuccess(response?.message || 'Operación completada');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Esta función requiere abrir en ventana separada', err.message);
+      }
+    }
+
+    async function openConfigDialog() {
+      showLoading('Cargando configuración...');
+      try {
+        const response = await callBackend('openConfigDialog');
+        hideLoading();
+
+        if (response && response.html) {
+          showError('Funcionalidad de configuración próximamente en el dashboard');
+        } else {
+          showSuccess(response?.message || 'Operación completada');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Esta función requiere abrir en ventana separada', err.message);
+      }
+    }
+
+    async function diagnosticarSistema() {
+      showLoading('Ejecutando diagnóstico del sistema...');
+      try {
+        const response = await callBackend('diagnosticarSistemaAlertas');
+        hideLoading();
+
+        if (response && response.success) {
+          showSuccess(response.message || 'Diagnóstico completado');
+        } else if (response && response.message) {
+          showSuccess(response.message);
+        } else {
+          showError('No se pudo completar el diagnóstico');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error al diagnosticar el sistema', err.message);
+      }
+    }
+
+    // ============================================================================
+    // ATTENDANCE REGISTRATION FUNCTIONS
+    // ============================================================================
+
+    let attendanceStudentsCache = [];
+
+    /**
+     * Load courses and schools for attendance registration
+     */
+    async function loadAttendanceDropdowns() {
+      try {
+        // Load courses
+        const courses = await callBackend('getCourses');
+        const courseSelect = document.getElementById('attendanceCourseSelect');
+        courseSelect.innerHTML = '<option value="">Selecciona un curso...</option>' +
+          courses.map(c => `<option value="${c}">${c}</option>`).join('');
+
+        // Load schools
+        const schools = await callBackend('getSchools');
+        const schoolSelect = document.getElementById('attendanceSchoolSelect');
+        schoolSelect.innerHTML = '<option value="">Selecciona un colegio...</option>' +
+          schools.map(s => `<option value="${s}">${s}</option>`).join('');
+      } catch (err) {
+        console.error('Error loading attendance dropdowns:', err);
+        showError('Error al cargar cursos y colegios', err.message);
+      }
+    }
+
+    /**
+     * Load students for selected course
+     */
+    async function loadStudentsForAttendance() {
+      const courseId = document.getElementById('attendanceCourseSelect').value;
+      const studentsListDiv = document.getElementById('attendanceStudentsList');
+      const tbody = document.getElementById('attendanceStudentsTable');
+
+      if (!courseId) {
+        studentsListDiv.style.display = 'none';
+        return;
+      }
+
+      try {
+        showLoading('Cargando estudiantes...');
+
+        const allStudents = await callBackend('getEstudiantesData');
+        attendanceStudentsCache = allStudents.filter(s => s.CursoID === courseId);
+
+        hideLoading();
+
+        if (attendanceStudentsCache.length === 0) {
+          showError('No hay estudiantes en este curso');
+          studentsListDiv.style.display = 'none';
+          return;
+        }
+
+        // Build table rows
+        tbody.innerHTML = attendanceStudentsCache.map((student, index) => `
+          <tr class="student-row" id="student-row-${index}">
+            <td>
+              <div style="line-height: 1.4;">
+                <strong style="font-size: 0.9375rem; color: var(--text);">${student.NombreEstudiante || 'Sin nombre'}</strong><br>
+                <span style="font-size: 0.8125rem; color: var(--text-light);">ID: ${student.IDEstudiante}</span>
+              </div>
+            </td>
+            <td>
+              <input type="checkbox" id="presente-${index}" onchange="updateRowHighlight(${index})">
+            </td>
+            <td>
+              <input type="checkbox" id="retraso-${index}">
+            </td>
+            <td>
+              <input type="checkbox" id="sinUniforme-${index}">
+            </td>
+            <td>
+              <input type="checkbox" id="sinAseo-${index}">
+            </td>
+          </tr>
+        `).join('');
+
+        studentsListDiv.style.display = 'block';
+      } catch (err) {
+        hideLoading();
+        console.error('Error loading students:', err);
+        showError('Error al cargar estudiantes', err.message);
+      }
+    }
+
+    /**
+     * Update row highlight when present checkbox changes
+     */
+    function updateRowHighlight(index) {
+      const row = document.getElementById(`student-row-${index}`);
+      const presentCheckbox = document.getElementById(`presente-${index}`);
+
+      if (presentCheckbox.checked) {
+        row.classList.add('present');
+      } else {
+        row.classList.remove('present');
+      }
+    }
+
+    /**
+     * Mark all students as present
+     */
+    function markAllPresent() {
+      attendanceStudentsCache.forEach((_, index) => {
+        const presentCheckbox = document.getElementById(`presente-${index}`);
+        if (presentCheckbox) {
+          presentCheckbox.checked = true;
+          updateRowHighlight(index);
+        }
+      });
+      showSuccess('Todos los estudiantes marcados como presentes');
+    }
+
+    /**
+     * Clear all attendance checkboxes
+     */
+    function clearAllAttendance() {
+      attendanceStudentsCache.forEach((_, index) => {
+        ['presente', 'retraso', 'sinUniforme', 'sinAseo'].forEach(field => {
+          const checkbox = document.getElementById(`${field}-${index}`);
+          if (checkbox) {
+            checkbox.checked = false;
+          }
+        });
+        updateRowHighlight(index);
+      });
+      showSuccess('Todos los registros limpiados');
+    }
+
+    /**
+     * Save attendance batch
+     */
+    async function saveAttendanceBatch() {
+      const fecha = document.getElementById('attendanceDate').value;
+      const cursoId = document.getElementById('attendanceCourseSelect').value;
+      const colegioId = document.getElementById('attendanceSchoolSelect').value;
+
+      // Validation
+      if (!fecha) {
+        showError('Por favor selecciona una fecha');
+        return;
+      }
+      if (!cursoId) {
+        showError('Por favor selecciona un curso');
+        return;
+      }
+      if (!colegioId) {
+        showError('Por favor selecciona un colegio');
+        return;
+      }
+
+      // Collect attendance records
+      const records = [];
+      attendanceStudentsCache.forEach((student, index) => {
+        const presente = document.getElementById(`presente-${index}`).checked;
+        const retraso = document.getElementById(`retraso-${index}`).checked;
+        const sinUniforme = document.getElementById(`sinUniforme-${index}`).checked;
+        const sinAseo = document.getElementById(`sinAseo-${index}`).checked;
+
+        records.push({
+          IDEstudiante: student.IDEstudiante,
+          NombreEstudiante: student.NombreEstudiante,
+          CursoID: cursoId,
+          ColegioID: colegioId,
+          Fecha: fecha,
+          Presente: presente,
+          Retraso: retraso,
+          SinUniforme: sinUniforme,
+          SinAseo: sinAseo
+        });
+      });
+
+      try {
+        showLoading(`Guardando asistencia de ${records.length} estudiantes...`);
+
+        const response = await callBackend('registrarAsistenciaBatch', records);
+        hideLoading();
+
+        if (response && response.success) {
+          showSuccess(response.message || `Asistencia guardada exitosamente para ${records.length} estudiantes`);
+          cancelAttendanceRegistration();
+          loadRecentAttendance();
+        } else {
+          showError(response?.message || 'Error al guardar asistencia');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error al guardar asistencia', err.message);
+      }
+    }
+
+    /**
+     * Cancel attendance registration
+     */
+    function cancelAttendanceRegistration() {
+      document.getElementById('attendanceCourseSelect').value = '';
+      document.getElementById('attendanceSchoolSelect').value = '';
+      document.getElementById('attendanceStudentsList').style.display = 'none';
+      document.getElementById('attendanceStudentsTable').innerHTML = '';
+      attendanceStudentsCache = [];
+    }
+
+    /**
+     * Load recent attendance records
+     */
+    async function loadRecentAttendance() {
+      try {
+        const records = await callBackend('getRecentAttendance', 10);
+
+        if (!records || records.length === 0) {
+          document.getElementById('recentAttendanceCard').style.display = 'none';
+          return;
+        }
+
+        const tbody = document.getElementById('recentAttendanceTable');
+        tbody.innerHTML = records.map(record => {
+          const observations = [];
+          if (record.Retraso) observations.push('Retraso');
+          if (record.SinUniforme) observations.push('Sin uniforme');
+          if (record.SinAseo) observations.push('Sin aseo');
+
+          return `
+            <tr>
+              <td>${record.Fecha || '-'}</td>
+              <td>${record.NombreEstudiante || '-'}</td>
+              <td><span class="badge badge-primary">${record.CursoID || '-'}</span></td>
+              <td>
+                <span class="badge ${record.Presente ? 'badge-success' : 'badge-danger'}">
+                  ${record.Presente ? '✓ Presente' : '✗ Ausente'}
+                </span>
+              </td>
+              <td>${observations.join(', ') || '-'}</td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('recentAttendanceCard').style.display = 'block';
+      } catch (err) {
+        console.error('Error loading recent attendance:', err);
+      }
+    }
+
+    // ============================================================================
+    // GRADES FUNCTIONS
+    // ============================================================================
+
+    function showGradesStudentModal() {
+      document.getElementById('studentModalTitle').textContent = 'Calificaciones - Estudiante';
+      document.getElementById('studentIdInput').value = '';
+
+      document.getElementById('studentModalConfirm').onclick = async () => {
+        const studentId = document.getElementById('studentIdInput').value.trim();
+        const validation = validateStudentId(studentId);
+
+        if (!validation.valid) {
+          showError(validation.error);
+          return;
+        }
+
+        closeModal('studentModal');
+        showLoading('Consultando calificaciones...');
+
+        try {
+          const response = await callBackend('reporteCalificacionPorEstudiante', studentId);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Reporte de Calificaciones - Estudiante ${studentId}`, response.data);
+              showSuccess(response.message || 'Reporte generado exitosamente');
+            } else {
+              showSuccess(response.message || 'Reporte generado y guardado en hoja');
+            }
+            loadStats();
+          } else {
+            showError(response?.message || 'Error al generar reporte');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al generar reporte', err.message);
+        }
+      };
+
+      showModal('studentModal');
+    }
+
+    function showGradesCourseModal() {
+      document.getElementById('courseModalTitle').textContent = 'Calificaciones - Curso';
+      document.getElementById('courseIdInput').value = '';
+
+      document.getElementById('courseModalConfirm').onclick = async () => {
+        const courseId = document.getElementById('courseIdInput').value.trim();
+        const validation = validateCourseId(courseId);
+
+        if (!validation.valid) {
+          showError(validation.error);
+          return;
+        }
+
+        closeModal('courseModal');
+        showLoading('Consultando calificaciones del curso...');
+
+        try {
+          const response = await callBackend('reporteCalificacionPorCurso', courseId);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Reporte de Calificaciones - Curso ${courseId}`, response.data);
+              showSuccess(response.message || 'Reporte generado exitosamente');
+            } else {
+              showSuccess(response.message || 'Reporte generado y guardado en hoja');
+            }
+            loadStats();
+          } else {
+            showError(response?.message || 'Error al generar reporte');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al generar reporte', err.message);
+        }
+      };
+
+      showModal('courseModal');
+    }
+
+    function compareGradesStudents() {
+      document.getElementById('comparisonModalTitle').textContent = 'Comparar Calificaciones - Estudiantes';
+      document.getElementById('comparisonLabel1').textContent = 'ID del primer estudiante';
+      document.getElementById('comparisonLabel2').textContent = 'ID del segundo estudiante';
+      document.getElementById('comparisonInput1').value = '';
+      document.getElementById('comparisonInput2').value = '';
+
+      document.getElementById('comparisonModalConfirm').onclick = async () => {
+        const est1 = document.getElementById('comparisonInput1').value.trim();
+        const est2 = document.getElementById('comparisonInput2').value.trim();
+
+        if (!est1 || !est2) {
+          showError('Por favor ingresa ambos IDs de estudiantes');
+          return;
+        }
+
+        closeModal('comparisonModal');
+        showLoading('Comparando calificaciones...');
+
+        try {
+          const response = await callBackend('compararCalificacionesEstudiantes', est1, est2);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Comparación de Calificaciones: ${est1} vs ${est2}`, response.data);
+              showSuccess(response.message || 'Comparación completada');
+            } else {
+              showSuccess(response.message || 'Comparación completada y guardada en hoja');
+            }
+          } else {
+            showError(response?.message || 'Error al comparar calificaciones');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al comparar calificaciones', err.message);
+        }
+      };
+
+      showModal('comparisonModal');
+    }
+
+    function compareGradesCourses() {
+      document.getElementById('comparisonModalTitle').textContent = 'Comparar Calificaciones - Cursos';
+      document.getElementById('comparisonLabel1').textContent = 'ID del primer curso';
+      document.getElementById('comparisonLabel2').textContent = 'ID del segundo curso';
+      document.getElementById('comparisonInput1').value = '';
+      document.getElementById('comparisonInput2').value = '';
+
+      document.getElementById('comparisonModalConfirm').onclick = async () => {
+        const cur1 = document.getElementById('comparisonInput1').value.trim();
+        const cur2 = document.getElementById('comparisonInput2').value.trim();
+
+        if (!cur1 || !cur2) {
+          showError('Por favor ingresa ambos IDs de cursos');
+          return;
+        }
+
+        closeModal('comparisonModal');
+        showLoading('Comparando calificaciones...');
+
+        try {
+          const response = await callBackend('compararCalificacionesCursos', cur1, cur2);
+          hideLoading();
+
+          if (response && response.success) {
+            if (response.data) {
+              showReportResults(`Comparación de Calificaciones: ${cur1} vs ${cur2}`, response.data);
+              showSuccess(response.message || 'Comparación completada');
+            } else {
+              showSuccess(response.message || 'Comparación completada y guardada en hoja');
+            }
+          } else {
+            showError(response?.message || 'Error al comparar calificaciones');
+          }
+        } catch (err) {
+          hideLoading();
+          showError('Error al comparar calificaciones', err.message);
+        }
+      };
+
+      showModal('comparisonModal');
+    }
+
+    // ============================================================================
+    // INSTRUMENTS FUNCTIONS
+    // ============================================================================
+
+    async function openInstrument(instrumentId) {
+      try {
+        showLoading('Abriendo instrumento...');
+        const url = await callBackend('getWebAppUrl');
+        hideLoading();
+
+        const finalUrl = url + '?instrumentId=' + encodeURIComponent(instrumentId);
+        window.open(finalUrl, '_blank');
+      } catch (err) {
+        hideLoading();
+        console.error('Error getting URL:', err);
+        showError('Error al abrir el instrumento', err.message);
+      }
+    }
+
+    // ============================================================================
+    // REPORTS FUNCTIONS
+    // ============================================================================
+
+    async function generateSituationReport() {
+      showLoading('Generando reporte de notas por situación...');
+
+      try {
+        const response = await callBackend('reporteNotasSituacion');
+        hideLoading();
+
+        if (response && response.success) {
+          showSuccess(response.message || 'Reporte generado exitosamente');
+        } else if (response && response.message) {
+          // Backend may not return success flag for some functions
+          showSuccess(response.message);
+        } else {
+          showError('No se pudo generar el reporte', 'Esta función puede requerir interacción adicional');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error al generar reporte', err.message);
+      }
+    }
+
+    async function generateAdvancedAttendanceReport() {
+      showLoading('Generando reporte avanzado de asistencia...');
+
+      try {
+        const response = await callBackend('reporteAsistenciaAvanzada_UI');
+        hideLoading();
+
+        if (response && response.success) {
+          showSuccess(response.message || 'Reporte generado exitosamente');
+        } else if (response && response.message) {
+          showSuccess(response.message);
+        } else {
+          showError('No se pudo generar el reporte', 'Esta función puede requerir interacción adicional');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error al generar reporte', err.message);
+      }
+    }
+
+    async function calculateWeightedAverage() {
+      showLoading('Calculando medias ponderadas...');
+
+      try {
+        const response = await callBackend('calculaMediaPonderadaDesdeHoja');
+        hideLoading();
+
+        if (response && response.success) {
+          showSuccess(response.message || 'Cálculo completado exitosamente');
+          loadStats(); // Refresh stats after calculation
+        } else if (response && response.message) {
+          showSuccess(response.message);
+        } else {
+          showError('No se pudo completar el cálculo', 'Esta función puede requerir interacción adicional');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error al calcular medias ponderadas', err.message);
+      }
+    }
+
+    async function exportData() {
+      showLoading('Preparando exportación de datos...');
+
+      try {
+        // This is a placeholder - actual implementation would call a backend function
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+        hideLoading();
+
+        showError(
+          'Funcionalidad de exportación en desarrollo',
+          'Próximamente podrás exportar los datos en formatos CSV, Excel y PDF.'
+        );
+      } catch (err) {
+        hideLoading();
+        showError('Error al exportar datos', err.message);
+      }
+    }
+
+    // ============================================================================
+    // INITIALIZATION
+    // ============================================================================
+
+    /**
+     * Initialize the dashboard when DOM is ready
+     */
+    function initializeDashboard() {
+      console.log('Initializing dashboard...');
+      console.log('Mode:', isModalMode ? 'Modal Dialog' : 'Web App');
+
+      // Load initial statistics
+      loadStats();
+
+      // Setup modal click-outside-to-close behavior
+      document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            closeModal(modal.id);
+          }
+        });
+      });
+
+      // Add Enter key support for inputs
+      const inputs = document.querySelectorAll('.form-input');
+      inputs.forEach(input => {
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            const modal = input.closest('.modal');
+            if (modal) {
+              const confirmButton = modal.querySelector('.btn-primary');
+              if (confirmButton) {
+                confirmButton.click();
+              }
+            }
+          }
+        });
+      });
+
+      console.log('Dashboard initialized successfully');
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeDashboard);
+    } else {
+      // DOM already loaded
+      initializeDashboard();
+    }
+
+    // ============================================================================
+    // UTILITY: OPEN IN NEW WINDOW (for modal mode)
+    // ============================================================================
+
+    /**
+     * Open dashboard in new window (only works from modal mode)
+     */
+    async function openDashboardInNewWindow() {
+      if (!isModalMode) {
+        showError('Ya estás en modo ventana independiente');
+        return;
+      }
+
+      try {
+        showLoading('Abriendo dashboard en nueva ventana...');
+        const url = await callBackend('getWebAppUrl');
+        hideLoading();
+
+        const finalUrl = url + '?view=dashboard';
+        window.open(finalUrl, '_blank', 'width=1400,height=900');
+        showSuccess('Dashboard abierto en nueva ventana');
+      } catch (err) {
+        hideLoading();
+        showError('Error al abrir en nueva ventana', err.message);
+      }
+    }
+
+    // Log any unhandled errors
+    window.addEventListener('error', (event) => {
+      console.error('Unhandled error:', event.error);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+    });
+  </script>
+</body>
+</html>

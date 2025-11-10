@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html><head><base target="_top">
+<style>
+body{font-family:Arial;padding:10px}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #ccc;padding:4px;text-align:left}
+button{padding:2px 6px;margin:0 2px}
+.activo{background:#d1e7dd}
+</style>
+</head><body>
+<h3>Programaciones</h3>
+<table>
+<thead><tr>
+  <th>Frecuencia</th><th>Hora</th><th>Días</th><th>Estado</th><th></th>
+</tr></thead>
+<tbody>
+<? data.forEach(function(s){ ?>
+<tr class="<?= s.activo?'activo':'' ?>">
+  <td><?= s.freq ?></td>
+  <td><?= ('0'+s.hora).slice(-2) ?>:<?= ('0'+s.min).slice(-2) ?></td>
+  <td><?= s.dias ? s.dias : 'todos' ?></td>
+  <td><?= s.activo?'Activo':'Inactivo' ?></td>
+  <td>
+    <? if(!s.activo){ ?>
+      <button onclick="act('<?= s.id ?>')">Activar</button>
+    <? } ?>
+    <button onclick="delSched('<?= s.id ?>')">Eliminar</button>
+  </td>
+</tr>
+<? }) ?>
+</tbody></table>
+
+<script>
+function act(id){
+  google.script.run
+    .withSuccessHandler(()=>location.reload())
+    .activateSchedule(id);
+}
+function delSched(id){
+  if(confirm('¿Eliminar esta programación?')){
+    google.script.run
+      .withSuccessHandler(()=>location.reload())
+      .deleteSchedule(id);
+  }
+}
+</script>
+</body></html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Beep Test - Evaluación por lotes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root{
+      --brand:#4f46e5; --bg1:#667eea; --bg2:#764ba2; --gray:#e5e7eb; --muted:#6b7280;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      margin:0;padding:20px;
+      background:linear-gradient(135deg,var(--bg1),var(--bg2));color:#111
+    }
+    .card{
+      max-width:1024px;margin:0 auto;background:#fff;border-radius:16px;
+      box-shadow:0 14px 34px rgba(0,0,0,.25);padding:20px
+    }
+    h1{margin:0 0 8px;text-align:center;color:var(--brand)}
+    .subtitle{margin:0 0 16px;text-align:center;color:var(--muted);font-size:14px}
+    .section{margin:12px 0}
+    .group{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .group.center{justify-content:center}
+    .pill, .btn{
+      padding:10px 14px;border-radius:12px;border:2px solid var(--gray);
+      background:#f3f4f6;font-weight:700;cursor:pointer;user-select:none
+    }
+    .pill.small{padding:8px 12px}
+    .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn.ghost{background:#eef2ff}
+    .pill.active{background:#e0e7ff;border-color:var(--brand)}
+    .grid{display:grid;gap:10px}
+    .levels{grid-template-columns:repeat(auto-fill, minmax(64px,1fr))}
+    .students{grid-template-columns:repeat(auto-fill, minmax(160px,1fr))}
+    .muted{color:var(--muted);font-size:13px}
+    table{width:100%;border-collapse:collapse;margin-top:14px}
+    th,td{border:1px solid var(--gray);padding:8px;text-align:center}
+    th{background:var(--brand);color:#fff}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0 12px}
+    .hide{display:none !important}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Beep Test - Evaluación por lotes</h1>
+    <p class="subtitle">
+      Instrumento: <strong><?!= instrumentoNombre ?></strong>
+      <? if (typeof nombreSituacion !== 'undefined' && nombreSituacion) { ?>
+        · Situación: <strong><?!= nombreSituacion ?></strong>
+      <? } ?>
+    </p>
+
+    <!-- Paso 1: sexo (solo para calcular la nota de la escala) -->
+    <div class="section">
+      <div class="group center" id="sexGroup" role="group" aria-label="Sexo para la escala">
+        <button class="pill" data-sex="M">Chico</button>
+        <button class="pill" data-sex="F">Chica</button>
+      </div>
+      <p class="subtitle muted">El sexo aquí solo afecta a la <em>escala de nota</em>, no filtra alumnos.</p>
+    </div>
+
+    <!-- Controles de visibilidad por sexo (ocultan en la parrilla de alumnos) -->
+    <div class="section toolbar">
+      <button id="hideBoys" class="pill small">Ocultar chicos</button>
+      <button id="hideGirls" class="pill small">Ocultar chicas</button>
+      <button id="showAll" class="pill small">Mostrar todos</button>
+    </div>
+
+    <!-- Paso 2: nivel alcanzado -->
+    <div class="section">
+      <div class="group"><span class="muted">Nivel:</span></div>
+      <div class="grid levels" id="levels"></div>
+    </div>
+
+    <!-- Paso 3: alumnos (botones multi-selección) -->
+    <div class="section">
+      <div class="group"><span class="muted">Alumnos:</span></div>
+      <div class="grid students" id="students"></div>
+      <div class="group center" style="margin-top:8px">
+        <button id="addList" class="btn ghost">Añadir a lista</button>
+      </div>
+    </div>
+
+    <!-- Lista pendiente -->
+    <div class="section">
+      <table id="tbl">
+        <thead>
+          <tr><th>Alumno</th><th>Sexo</th><th>Nivel</th><th>Nota</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="group center" style="margin-top:12px">
+        <button id="save" class="btn primary">Guardar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Datos del servidor con fallback seguro =====
+    window.SERVER = {
+      instrumentoId: <?!= JSON.stringify(instrumentoID || '') ?>,
+      instrumentoNombre: <?!= JSON.stringify(instrumentoNombre || 'Beep Test') ?>,
+      nombreSituacion: <?!= JSON.stringify(typeof nombreSituacion !== 'undefined' ? nombreSituacion : '') ?>,
+      estudiantes: <?!= JSON.stringify(estudiantes || []) ?>
+    };
+
+    // ====== Escalas (ajustadas: 10 → chicos≈13, chicas≈11) ======
+    const scaleBoys  = { 1:0.0,  5:4.0,  9:7.5,  11:9.0,  13:10.0 };
+    const scaleGirls = { 1:0.0,  4:4.5,  8:8.5,  10:9.5,  11:10.0 };
+
+    function interp(scale, lvl){
+      const keys = Object.keys(scale).map(Number).sort((a,b)=>a-b);
+      if (lvl <= keys[0]) return scale[keys[0]];
+      if (lvl >= keys[keys.length-1]) return scale[keys[keys.length-1]];
+      for (let i=0;i<keys.length-1;i++){
+        const x0=keys[i], x1=keys[i+1];
+        if (lvl>=x0 && lvl<=x1){
+          const y0=scale[x0], y1=scale[x1];
+          return y0 + (y1-y0)*((lvl-x0)/(x1-x0));
+        }
+      }
+      return 0;
+    }
+
+    // ====== Estado ======
+    let selectedSex = '';       // 'M' | 'F'
+    let selectedLevel = null;   // number
+    let selectedStudents = new Set();   // IDs seleccionados en UI
+
+    // Alumnos disponibles en UI (se van eliminando al añadir a lista)
+    let availableStudents = (SERVER.estudiantes || []).map(e => ({
+      id: e.IDEstudiante || e.IdEstudiante || e.ID || e.Id || '',
+      name: e.NombreEstudiante || e.Nombre || e.Alumno || 'Sin nombre',
+      sex: (e.Sexo || e.SEXO || e.Genero || e.Género || e.Gender || e.gender || '').toString().trim().toUpperCase().startsWith('F') ? 'F' :
+           (e.Sexo || e.SEXO || e.Genero || e.Género || e.Gender || e.gender || '').toString().trim().toUpperCase().startsWith('M') ? 'M' : ''
+    })).filter(x => x.id);
+
+    // Niveles disponibles (se eliminan <= seleccionado tras añadir)
+    let availableLevels = [];
+    for (let v=1; v<=13; v+=0.5) availableLevels.push(Number(v.toFixed(1)));
+
+    // Filtros de visibilidad por sexo en el grid de alumnos
+    let hideBoys = false;
+    let hideGirls = false;
+
+    // Lote temporal a guardar
+    let batch = [];
+
+    // ====== Render ======
+    const $ = sel => document.querySelector(sel);
+    const levelsDiv = $('#levels');
+    const studentsDiv = $('#students');
+
+    function renderSexButtons(){
+      document.querySelectorAll('#sexGroup .pill').forEach(b=>{
+        b.classList.toggle('active', b.dataset.sex === selectedSex);
+      });
+    }
+
+    function renderLevels(){
+      levelsDiv.innerHTML = '';
+      if (!availableLevels.length){
+        const msg = document.createElement('div');
+        msg.className = 'muted';
+        msg.textContent = 'No quedan niveles disponibles.';
+        levelsDiv.appendChild(msg);
+        return;
+      }
+      availableLevels.forEach(lvl=>{
+        const btn = document.createElement('button');
+        btn.className = 'pill';
+        btn.textContent = String(lvl).replace('.', ',');
+        if (lvl === selectedLevel) btn.classList.add('active');
+        btn.addEventListener('click', ()=>{
+          selectedLevel = lvl;
+          document.querySelectorAll('#levels .pill').forEach(x=>x.classList.remove('active'));
+          btn.classList.add('active');
+        });
+        levelsDiv.appendChild(btn);
+      });
+    }
+
+    function renderStudents(){
+      studentsDiv.innerHTML = '';
+      const list = availableStudents.filter(s=>{
+        if (hideBoys && s.sex==='M') return false;
+        if (hideGirls && s.sex==='F') return false;
+        return true;
+      });
+      if (!list.length){
+        const msg = document.createElement('div');
+        msg.className = 'muted';
+        msg.textContent = 'No hay alumnos visibles con el filtro actual.';
+        studentsDiv.appendChild(msg);
+        return;
+      }
+      list.forEach(st=>{
+        const btn = document.createElement('button');
+        btn.className = 'pill';
+        btn.dataset.id = st.id;
+        btn.textContent = st.name + (st.sex ? ` (${st.sex})` : '');
+        if (selectedStudents.has(st.id)) btn.classList.add('active');
+        btn.addEventListener('click', ()=>{
+          if (selectedStudents.has(st.id)) {
+            selectedStudents.delete(st.id);
+            btn.classList.remove('active');
+          } else {
+            selectedStudents.add(st.id);
+            btn.classList.add('active');
+          }
+        });
+        studentsDiv.appendChild(btn);
+      });
+    }
+
+    function renderTable(){
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      batch.forEach(item=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${item.name}</td><td>${item.sex||''}</td><td>${item.level}</td><td>${item.grade.toFixed(2)}</td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    // ====== Listeners ======
+    // Sexo para escala
+    document.querySelectorAll('#sexGroup .pill').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        selectedSex = b.dataset.sex;
+        renderSexButtons();
+      });
+    });
+
+    // Ocultar/mostrar por sexo (solo en parrilla de alumnos)
+    $('#hideBoys').addEventListener('click', ()=>{
+      hideBoys = true; hideGirls = false;
+      renderStudents();
+    });
+    $('#hideGirls').addEventListener('click', ()=>{
+      hideGirls = true; hideBoys = false;
+      renderStudents();
+    });
+    $('#showAll').addEventListener('click', ()=>{
+      hideGirls = false; hideBoys = false;
+      renderStudents();
+    });
+
+    // Añadir a la lista
+    $('#addList').addEventListener('click', ()=>{
+      if (!selectedSex) { alert('Selecciona el sexo para la escala (Chico/Chica).'); return; }
+      if (selectedLevel == null) { alert('Selecciona un nivel.'); return; }
+      if (selectedStudents.size === 0) { alert('Selecciona al menos un alumno.'); return; }
+
+      const scale = (selectedSex === 'M') ? scaleBoys : scaleGirls;
+      const grade = interp(scale, selectedLevel);
+
+      // Agregar cada alumno seleccionado al lote
+      const idsToRemove = [];
+      selectedStudents.forEach(id=>{
+        const st = availableStudents.find(s=>s.id===id);
+        if (!st) return;
+        batch.push({
+          studentId: id,
+          name: st.name,
+          sex: st.sex,
+          level: selectedLevel,
+          grade: grade
+        });
+        idsToRemove.push(id);
+      });
+
+      // 1) Quitar alumnos ya añadidos de la lista de disponibles
+      if (idsToRemove.length){
+        availableStudents = availableStudents.filter(s => !idsToRemove.includes(s.id));
+      }
+
+      // 2) Quitar niveles <= seleccionado
+      availableLevels = availableLevels.filter(lvl => lvl > selectedLevel);
+
+      // Reset UI (nivel y alumnos deseleccionados)
+      selectedStudents.clear();
+      selectedLevel = null;
+
+      renderLevels();
+      renderStudents();
+      renderTable();
+    });
+
+    // Guardar todo en la hoja
+    $('#save').addEventListener('click', ()=>{
+      if (!batch.length) { alert('No hay datos para guardar.'); return; }
+      const payload = {
+        instrumentoId: SERVER.instrumentoId,
+        instrumentoNombre: SERVER.instrumentoNombre,
+        nombreSituacion: SERVER.nombreSituacion,
+        records: batch.map(r => ({
+          studentId: r.studentId, level: r.level, grade: r.grade, sex: r.sex
+        }))
+      };
+      google.script.run
+        .withSuccessHandler(res=>{
+          alert('Guardado correctamente (' + (res && res.inserted || batch.length) + ' registros).');
+          // Reiniciar todo tras guardar
+          batch = [];
+          // recargar alumnos/levels por si se quiere nueva tanda (opcionalmente podrías dejarlo vacío)
+          // Aquí NO recuperamos los alumnos eliminados, por diseño del flujo; si prefieres, haz location.reload()
+          renderTable();
+        })
+        .withFailureHandler(err=> alert('Error: ' + (err && err.message || err)))
+        .recordNumericGradesBatch(payload);
+    });
+
+    // ====== Inicio ======
+    renderSexButtons();
+    renderLevels();
+    renderStudents();
+    renderTable();
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><base target="_top">
+<style>
+body{font-family:Arial;padding:10px}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #ccc;padding:4px;text-align:left}
+button{padding:2px 6px}
+</style></head><body>
+<h3>Triggers activos</h3>
+<table>
+  <thead><tr><th>Función</th><th>Hora</th><th></th></tr></thead>
+  <tbody>
+    <? data.forEach(function(t){ ?>
+      <tr>
+        <td><?= t.fn ?></td><td><?= t.time ?></td>
+        <td><button onclick="delTrig('<?= t.id ?>')">Eliminar</button></td>
+      </tr>
+    <? }) ?>
+  </tbody>
+</table>
+<script>
+function delTrig(id){
+  if(confirm('Eliminar este trigger?')){
+    google.script.run
+      .withSuccessHandler(()=>location.reload())
+      .deleteTrig(id);
+  }
+}
+</script>
+</body></html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html><head><base target="_top">
+<style>
+body{font-family:Arial;padding:14px}
+label{display:block;margin-top:6px}
+input{width:80px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:4px;text-align:center;border:1px solid #ccc}
+</style></head><body>
+<h3>Configuración de alertas</h3>
+<form id="f">
+  <label>Sesiones previstas evaluación:
+    <input type="number" name="SesionesPrevistas" value="30" min="1">
+  </label>
+  <hr>
+  <p><b>Porcentajes de aviso (Aviso1 / Aviso2)</b></p>
+  <table>
+    <tr><th></th><th>% Aviso1</th><th>% Aviso2</th></tr>
+    <tr><td>Ausencias</td>
+        <td><input type="number" name="Aus_%1" value="50" min="0" max="100"></td>
+        <td><input type="number" name="Aus_%2" value="80" min="0" max="100"></td></tr>
+    <tr><td>Retrasos</td>
+        <td><input type="number" name="Ret_%1" value="20" min="0" max="100"></td>
+        <td><input type="number" name="Ret_%2" value="40" min="0" max="100"></td></tr>
+    <tr><td>Sin uniforme</td>
+        <td><input type="number" name="Uni_%1" value="10" min="0" max="100"></td>
+        <td><input type="number" name="Uni_%2" value="20" min="0" max="100"></td></tr>
+    <tr><td>Sin aseo</td>
+        <td><input type="number" name="Ase_%1" value="10" min="0" max="100"></td>
+        <td><input type="number" name="Ase_%2" value="20" min="0" max="100"></td></tr>
+  </table>
+  <br>
+  <button type="button" onclick="guardar()">Guardar</button>
+</form>
+<script>
+function guardar(){
+  const data=Object.fromEntries(new FormData(document.getElementById('f')).entries());
+  google.script.run
+    .withSuccessHandler(()=>google.script.host.close())
+    .saveConfig(data);
+}
+</script>
+</body></html>
