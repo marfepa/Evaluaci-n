@@ -547,7 +547,27 @@ function getNombreSituacion(ss, instrumento) {
   return iNm >= 0 ? (row[iNm] || situId) : (situId || '');
 }
 
-/* Lee una hoja y devuelve { headers, values } - Ahora sin caché local */
+/**
+ * Lee datos directamente de una hoja sin caché
+ * Esta función es usada internamente por getSheetData y getSheetDataCached
+ */
+function getSheetDataDirect(ss, sheetName) {
+  if (!ss) ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    Logger.log('Hoja ' + sheetName + ' no encontrada.');
+    return { headers: [], values: [] };
+  }
+
+  const all = sheet.getDataRange().getValues();
+  return { headers: all[0] || [], values: all.slice(1) };
+}
+
+/**
+ * Lee una hoja y devuelve { headers, values }
+ * Usa caché si CacheOptimizado.gs está disponible
+ */
 function getSheetData(ss, sheetName) {
   if (!ss) ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
@@ -557,14 +577,7 @@ function getSheetData(ss, sheetName) {
   }
 
   // ⚠️ Fallback: Leer directamente si CacheOptimizado.gs no está cargado
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    Logger.log('Hoja ' + sheetName + ' no encontrada.');
-    return { headers: [], values: [] };
-  }
-
-  const all = sheet.getDataRange().getValues();
-  return { headers: all[0] || [], values: all.slice(1) };
+  return getSheetDataDirect(ss, sheetName);
 }
 
 /* Índice del primero de varios nombres posibles */
@@ -2426,39 +2439,55 @@ function getCourses() {
 }
 
 // Wrapper para getStatistics con caché
+/**
+ * Calcula estadísticas directamente sin usar caché
+ * Esta función es usada internamente por getStatistics y getStatisticsCached
+ */
+function getStatisticsDirect() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const estudiantes = getEstudiantes(ss);
+  const instrumentos = getInstrumentos(ss);
+
+  // Contar cursos únicos
+  const cursosSet = new Set();
+  estudiantes.forEach(est => {
+    const curso = est.CursoID || est.Curso || est.CursoEvaluado;
+    if (curso) cursosSet.add(String(curso));
+  });
+
+  // Contar calificaciones
+  let totalGrades = 0;
+  try {
+    const { values } = getSheetDataDirect(ss, 'CalificacionesDetalladas');
+    totalGrades = values.length;
+  } catch (e) {
+    Logger.log('Could not count grades:', e.message);
+  }
+
+  return {
+    students: estudiantes.length,
+    courses: cursosSet.size,
+    instruments: instrumentos.length,
+    grades: totalGrades
+  };
+}
+
+/**
+ * Obtiene estadísticas del sistema
+ * Usa caché si está disponible
+ */
 function getStatistics() {
   try {
-    return getStatisticsCached();
-  } catch (error) {
-    Logger.log('Error in getStatistics:', error.message);
-    // Fallback: calcular estadísticas básicas
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const estudiantes = getEstudiantes(ss);
-    const instrumentos = getInstrumentos(ss);
-
-    // Contar cursos únicos
-    const cursosSet = new Set();
-    estudiantes.forEach(est => {
-      const curso = est.CursoID || est.Curso || est.CursoEvaluado;
-      if (curso) cursosSet.add(String(curso));
-    });
-
-    // Contar calificaciones
-    let totalGrades = 0;
-    try {
-      const { values } = getSheetData(ss, 'CalificacionesDetalladas');
-      totalGrades = values.length;
-    } catch (e) {
-      Logger.log('Could not count grades:', e.message);
+    // ✅ Usar caché si está disponible
+    if (typeof getStatisticsCached === 'function') {
+      return getStatisticsCached();
     }
-
-    return {
-      students: estudiantes.length,
-      courses: cursosSet.size,
-      instruments: instrumentos.length,
-      grades: totalGrades
-    };
+  } catch (error) {
+    Logger.log('Error in getStatistics (caché):', error.message);
   }
+
+  // ⚠️ Fallback: calcular sin caché
+  return getStatisticsDirect();
 }
 
 // Función para obtener lista de colegios (necesaria para asistencia)

@@ -401,7 +401,7 @@ function getCursosCached() {
 function getStatisticsCached() {
   return getCachedData(
     'statistics_dashboard',
-    () => getStatistics(),
+    () => getStatisticsDirect(),  // ✅ Llamar a función directa para evitar recursión
     CACHE_CONFIG.TTL.ESTADISTICAS
   );
 }
@@ -413,7 +413,7 @@ function getSheetDataCached(ss, sheetName, ttl = 600) {
   const key = `sheet_${sheetName}`;
   return getCachedData(
     key,
-    () => getSheetData(ss, sheetName),
+    () => getSheetDataDirect(ss, sheetName),  // ✅ Llamar a función directa para evitar recursión
     ttl
   );
 }
