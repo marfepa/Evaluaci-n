@@ -3074,20 +3074,151 @@
     }
 
     async function exportData() {
-      showLoading('Preparando exportación de datos...');
+      showLoading('Obteniendo lista de reportes...');
 
       try {
-        // This is a placeholder - actual implementation would call a backend function
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+        const response = await callBackend('listarReportesExistentes');
         hideLoading();
 
-        showError(
-          'Funcionalidad de exportación en desarrollo',
-          'Próximamente podrás exportar los datos en formatos CSV, Excel y PDF.'
-        );
+        if (!response || !response.success) {
+          showError('Error', response?.message || 'No se pudo obtener la lista de reportes');
+          return;
+        }
+
+        const reportes = response.data;
+
+        if (reportes.length === 0) {
+          showError('Sin reportes', 'No hay reportes generados todavía. Primero genera un reporte para poder exportarlo.');
+          return;
+        }
+
+        // Crear diálogo para seleccionar reporte a exportar
+        const dialog = document.createElement('div');
+        dialog.className = 'modal';
+        dialog.style.display = 'flex';
+
+        // Agrupar reportes por tipo
+        const reportesPorTipo = {
+          notas: reportes.filter(r => r.tipo === 'notas'),
+          asistencia_avanzada: reportes.filter(r => r.tipo === 'asistencia_avanzada'),
+          asistencia: reportes.filter(r => r.tipo === 'asistencia'),
+          comparativa: reportes.filter(r => r.tipo === 'comparativa')
+        };
+
+        const formatFecha = (fecha) => {
+          try {
+            return new Date(fecha).toLocaleString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          } catch {
+            return 'Fecha desconocida';
+          }
+        };
+
+        const crearListaReportes = (listaReportes, titulo, icono) => {
+          if (listaReportes.length === 0) return '';
+          return `
+            <div style="margin-bottom: 20px;">
+              <h4 style="color: #2563eb; margin-bottom: 10px;">${icono} ${titulo}</h4>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${listaReportes.map(r => `
+                  <button
+                    class="btn btn-outline"
+                    style="text-align: left; padding: 12px; display: flex; justify-content: space-between; align-items: center;"
+                    data-reporte-nombre="${r.nombre}"
+                  >
+                    <div>
+                      <div style="font-weight: 600;">${r.nombre}</div>
+                      <div style="font-size: 0.85em; color: #64748b; margin-top: 4px;">
+                        ${r.tipo === 'notas' ? `${r.info.curso} - ${r.info.situacion}` : r.info.descripcion || r.info.fecha || ''}
+                      </div>
+                    </div>
+                    <div style="font-size: 0.8em; color: #94a3b8;">
+                      ${formatFecha(r.ultimaModificacion)}
+                    </div>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        };
+
+        dialog.innerHTML = `
+          <div class="modal-content" style="max-width: 700px; max-height: 85vh; overflow-y: auto;">
+            <h3>Exportar Reporte a PDF</h3>
+            <p style="color: #64748b; margin-bottom: 20px;">
+              Selecciona un reporte para exportarlo en formato PDF
+            </p>
+
+            ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas', '📄')}
+            ${crearListaReportes(reportesPorTipo.asistencia_avanzada, 'Reportes Avanzados de Asistencia', '📊')}
+            ${crearListaReportes(reportesPorTipo.asistencia, 'Reportes de Asistencia', '✓')}
+            ${crearListaReportes(reportesPorTipo.comparativa, 'Comparativas', '📈')}
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+              <button class="btn btn-outline" id="btn-cancelar-exportar" style="flex: 1;">Cerrar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // Añadir manejadores
+        const btnCancelar = dialog.querySelector('#btn-cancelar-exportar');
+        btnCancelar.addEventListener('click', () => {
+          dialog.remove();
+        });
+
+        // Manejadores para botones de reportes
+        const botonesReportes = dialog.querySelectorAll('[data-reporte-nombre]');
+        botonesReportes.forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const nombreReporte = btn.getAttribute('data-reporte-nombre');
+            dialog.remove();
+            await exportarReporteSeleccionado(nombreReporte);
+          });
+        });
+
+        // Cerrar al hacer clic fuera
+        dialog.addEventListener('click', (e) => {
+          if (e.target === dialog) {
+            dialog.remove();
+          }
+        });
+
       } catch (err) {
         hideLoading();
         showError('Error al exportar datos', err.message);
+      }
+    }
+
+    async function exportarReporteSeleccionado(nombreReporte) {
+      showLoading(`Generando PDF de "${nombreReporte}"...`);
+
+      try {
+        const response = await callBackend('exportarReportePDF', nombreReporte);
+        hideLoading();
+
+        if (!response || !response.success) {
+          showError('Error', response?.message || 'No se pudo generar el PDF');
+          return;
+        }
+
+        // Abrir el PDF en una nueva pestaña
+        window.open(response.url, '_blank');
+
+        showSuccess(
+          'PDF Generado',
+          `El reporte "${nombreReporte}" se ha exportado correctamente. Se abrirá en una nueva pestaña.`
+        );
+
+      } catch (err) {
+        hideLoading();
+        showError('Error al generar PDF', err.message);
       }
     }
 
