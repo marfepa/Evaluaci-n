@@ -1295,6 +1295,82 @@ function reporteNotasSituacion() {
   ui.showModalDialog(html, 'Selecciona Reporte de Notas');
 }
 
+/**
+ * Obtiene el mapeo de cursos y situaciones disponibles para reportes
+ * Retorna un objeto con cursos como keys y arrays de situaciones como values
+ */
+function getCursosSituacionesMapping() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // Verificar que la hoja existe
+    const sheet = ss.getSheetByName('CalificacionesDetalladas');
+    if (!sheet) {
+      return { success: false, message: 'La hoja "CalificacionesDetalladas" no existe.' };
+    }
+
+    const { headers, values } = getSheetDataDirect(ss, 'CalificacionesDetalladas');
+
+    // Verificar que hay datos
+    if (!values || values.length === 0) {
+      return { success: false, message: 'La hoja "CalificacionesDetalladas" está vacía.' };
+    }
+
+    const idxC = headers.indexOf('CursoEvaluado');
+    const idxS = headers.indexOf('NombreSituacion');
+
+    // Verificar que las columnas existen
+    if (idxC === -1 || idxS === -1) {
+      return {
+        success: false,
+        message: 'No se encontraron las columnas necesarias (CursoEvaluado, NombreSituacion).'
+      };
+    }
+
+    // Usar Sets para evitar duplicados
+    const mapping = {};
+    const tempSets = {};
+
+    // Procesar datos
+    for (let i = 0; i < values.length; i++) {
+      const r = values[i];
+      const curso = r[idxC], sit = r[idxS];
+      if (curso && sit) {
+        if (!tempSets[curso]) {
+          tempSets[curso] = new Set();
+          mapping[curso] = [];
+        }
+        if (!tempSets[curso].has(sit)) {
+          tempSets[curso].add(sit);
+          mapping[curso].push(sit);
+        }
+      }
+    }
+
+    // Ordenar situaciones dentro de cada curso
+    Object.keys(mapping).forEach(curso => {
+      mapping[curso].sort();
+    });
+
+    // Verificar que hay cursos disponibles
+    if (Object.keys(mapping).length === 0) {
+      return {
+        success: false,
+        message: 'No hay cursos con situaciones disponibles en "CalificacionesDetalladas".'
+      };
+    }
+
+    return {
+      success: true,
+      data: mapping
+    };
+
+  } catch (error) {
+    Logger.log('Error en getCursosSituacionesMapping: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
 function generateReporteNotasSituacion(curso, situacion) {
   try {
     // Validar parámetros
@@ -1458,6 +1534,190 @@ function calculaMediaPonderadaDesdeHoja() {
 
   sh.autoResizeColumns(startCol, totalCols);
   ui.alert(`✅ Medias ponderadas añadidas en “${name}”\nCurso: ${curso}\nSituación: ${situa}`);
+}
+
+/**
+ * Obtiene la lista de hojas de reporte disponibles (RepNotas)
+ * Para que la UI pueda mostrar un selector
+ */
+function getHojasReportes() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheets = ss.getSheets();
+    const reportSheets = sheets
+      .filter(s => s.getName().startsWith('RepNotas '))
+      .map(s => s.getName())
+      .sort();
+
+    if (reportSheets.length === 0) {
+      return {
+        success: false,
+        message: 'No hay hojas de reporte disponibles. Genera primero un reporte por curso-situación.'
+      };
+    }
+
+    return {
+      success: true,
+      data: reportSheets
+    };
+
+  } catch (error) {
+    Logger.log('Error en getHojasReportes: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Obtiene la lista de instrumentos de una hoja RepNotas específica
+ * Para que la UI pueda solicitar los pesos
+ */
+function getInstrumentosDeReporte(nombreHoja) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sh = ss.getSheetByName(nombreHoja);
+
+    if (!sh) {
+      return { success: false, message: 'La hoja "' + nombreHoja + '" no existe.' };
+    }
+
+    if (!nombreHoja.startsWith('RepNotas ')) {
+      return { success: false, message: 'La hoja debe comenzar con "RepNotas "' };
+    }
+
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, message: 'No hay datos en la hoja.' };
+    }
+
+    const datos = sh.getRange(2, 1, lastRow - 1, 4).getValues();
+    const instrumentos = Array.from(new Set(datos.map(r => r[1])));
+    const estudiantes = Array.from(new Set(datos.map(r => r[0])));
+
+    if (!instrumentos.length || !estudiantes.length) {
+      return { success: false, message: 'No se encontraron instrumentos o estudiantes.' };
+    }
+
+    // Extraer curso y situación del nombre de hoja
+    const resto = nombreHoja.substring(9);
+    const dash = resto.indexOf('-');
+    const curso = dash >= 0 ? resto.substring(0, dash).trim() : '';
+    const situa = dash >= 0 ? resto.substring(dash + 1).trim() : '';
+
+    return {
+      success: true,
+      data: {
+        instrumentos: instrumentos,
+        estudiantes: estudiantes.length,
+        curso: curso,
+        situacion: situa
+      }
+    };
+
+  } catch (error) {
+    Logger.log('Error en getInstrumentosDeReporte: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Calcula medias ponderadas en una hoja RepNotas con los pesos especificados
+ * Versión compatible con UI que recibe los pesos como parámetro
+ */
+function calcularMediaPonderada(nombreHoja, pesos) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sh = ss.getSheetByName(nombreHoja);
+
+    if (!sh) {
+      return { success: false, message: 'La hoja "' + nombreHoja + '" no existe.' };
+    }
+
+    const name = sh.getName();
+    if (!name.startsWith('RepNotas ')) {
+      return { success: false, message: 'La hoja debe comenzar con "RepNotas "' };
+    }
+
+    const resto = name.substring(9);
+    const dash = resto.indexOf('-');
+    if (dash < 0) {
+      return { success: false, message: 'El nombre de hoja debe ser "RepNotas <Curso>-<Situación>"' };
+    }
+    const curso = resto.substring(0, dash).trim();
+    const situa = resto.substring(dash + 1).trim();
+
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, message: 'No hay datos en la hoja.' };
+    }
+
+    const datos = sh.getRange(2, 1, lastRow - 1, 4).getValues();
+    const instrumentos = Array.from(new Set(datos.map(r => r[1])));
+    const estudiantes = Array.from(new Set(datos.map(r => r[0])));
+
+    if (!instrumentos.length || !estudiantes.length) {
+      return { success: false, message: 'No se encontraron instrumentos o estudiantes.' };
+    }
+
+    // Validar que todos los instrumentos tienen peso
+    for (const inst of instrumentos) {
+      if (pesos[inst] === undefined || pesos[inst] === null) {
+        return { success: false, message: 'Falta el peso para el instrumento: ' + inst };
+      }
+      const peso = parseFloat(pesos[inst]);
+      if (isNaN(peso) || peso < 0) {
+        return { success: false, message: 'Peso inválido para ' + inst + ': ' + pesos[inst] };
+      }
+    }
+
+    const startCol = 6; // F
+    const totalCols = instrumentos.length + 2; // Est + N inst + Media
+    sh.getRange(1, startCol, sh.getMaxRows(), totalCols).clearContent();
+
+    const headerRow = ['Estudiante', ...instrumentos, 'Media Ponderada'];
+    sh.getRange(1, startCol, 1, headerRow.length).setValues([headerRow]);
+
+    const pesoRow = ['Peso']
+      .concat(instrumentos.map(i => {
+        const p = parseFloat(pesos[i]);
+        const s = (p % 1 === 0 ? `${p}` : `${p}`.replace('.', ','));
+        return s + '%';
+      }))
+      .concat(['']);
+    sh.getRange(2, startCol, 1, pesoRow.length).setValues([pesoRow]);
+
+    const cuerpo = estudiantes.map(est => {
+      const fila = instrumentos.map(inst => {
+        const notas = datos.filter(r => r[0] === est && r[1] === inst).map(r => parseFloat(r[3]) || 0);
+        if (!notas.length) return '';
+        const avg = notas.reduce((a, b) => a + b, 0) / notas.length;
+        return avg.toFixed(2).replace('.', ',');
+      });
+      return [est, ...fila, ''];
+    });
+    sh.getRange(3, startCol, cuerpo.length, headerRow.length).setValues(cuerpo);
+
+    for (let i = 0; i < estudiantes.length; i++) {
+      const row = 3 + i;
+      const terms = instrumentos.map((inst, j) => {
+        const colNum = startCol + 1 + j; // G, H, ...
+        const letra = colToLetter(colNum);
+        return `${letra}$2*${letra}${row}`; // peso * nota
+      });
+      const formula = `=${terms.join('+')}`;
+      sh.getRange(row, startCol + instrumentos.length + 1).setFormula(formula);
+    }
+
+    sh.autoResizeColumns(startCol, totalCols);
+
+    return {
+      success: true,
+      message: `✅ Medias ponderadas añadidas en "${name}"\nCurso: ${curso}\nSituación: ${situa}`
+    };
+
+  } catch (error) {
+    Logger.log('Error en calcularMediaPonderada: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
 }
 
 /** Convierte número de columna a letra (1→A, 27→AA, …) */
@@ -1961,13 +2221,11 @@ function compararCalificacionesCursos(cur1, cur2) {
  */
 function reporteAsistenciaAvanzada_UI() {
   try {
-    const ui = SpreadsheetApp.getUi();
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const { headers, values } = getSheetData(ss, 'RegistroAsistencia');
 
     if (!values || values.length === 0) {
-      ui.alert('No hay datos de asistencia para generar el reporte');
-      return { success: false, message: 'No hay datos disponibles' };
+      return { success: false, message: 'No hay datos de asistencia disponibles' };
     }
 
     // Obtener índices de columnas
@@ -2054,12 +2312,44 @@ function reporteAsistenciaAvanzada_UI() {
     // Autoajustar columnas
     hoja.autoResizeColumns(1, 5);
 
-    ui.showSidebar(HtmlService.createHtmlOutput('✅ «Reporte_Avanzado_Asistencia» generado exitosamente').setWidth(250));
-    return { success: true, message: '✅ Reporte avanzado generado' };
+    // Preparar datos para retornar a la UI
+    const data = {
+      global: {
+        totalRegistros,
+        totalPresentes,
+        totalAusentes,
+        porcentajeGlobal
+      },
+      cursos: Object.keys(cursosMap).sort().map(curso => {
+        const stats = cursosMap[curso];
+        return {
+          curso,
+          total: stats.total,
+          presentes: stats.presentes,
+          ausentes: stats.total - stats.presentes,
+          porcentaje: ((stats.presentes / stats.total) * 100).toFixed(1)
+        };
+      }),
+      estudiantes: Object.keys(estatudiantesMap).sort().map(est => {
+        const stats = estatudiantesMap[est];
+        return {
+          estudiante: est,
+          total: stats.total,
+          presentes: stats.presentes,
+          ausentes: stats.total - stats.presentes,
+          porcentaje: ((stats.presentes / stats.total) * 100).toFixed(1)
+        };
+      })
+    };
+
+    return {
+      success: true,
+      message: '✅ Reporte avanzado generado en la hoja "Reporte_Avanzado_Asistencia"',
+      data: data
+    };
 
   } catch (error) {
     Logger.log('Error en reporteAsistenciaAvanzada_UI: ' + error);
-    SpreadsheetApp.getUi().alert('Error al generar reporte: ' + error.message);
     return { success: false, message: 'Error: ' + error.message };
   }
 }
@@ -2070,10 +2360,15 @@ function reporteAsistenciaAvanzada_UI() {
  */
 function diagnosticarSistemaAlertas() {
   try {
-    const ui = SpreadsheetApp.getUi();
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
     let diagnostico = [];
+    let data = {
+      configuracion: {},
+      programaciones: [],
+      triggers: [],
+      asistencia: {}
+    };
 
     // 1. Verificar configuración
     diagnostico.push('=== CONFIGURACIÓN ===');
@@ -2084,9 +2379,16 @@ function diagnosticarSistemaAlertas() {
       diagnostico.push('  - Ventana de análisis: ' + (config[0] || 'No definida'));
       diagnostico.push('  - Destinatarios: ' + (config[1] || 'No definidos'));
       diagnostico.push('  - Análisis automático: ' + (config[2] ? 'ACTIVO' : 'INACTIVO'));
+      data.configuracion = {
+        encontrada: true,
+        ventanaAnalisis: config[0] || 'No definida',
+        destinatarios: config[1] || 'No definidos',
+        analisisAutomatico: config[2] || false
+      };
     } else {
       diagnostico.push('❌ Configuración: NO ENCONTRADA');
       diagnostico.push('  → Configura el sistema desde: ⚙️ Automatización > ⚙️ Configurar alertas');
+      data.configuracion = { encontrada: false };
     }
 
     diagnostico.push('');
@@ -2103,6 +2405,11 @@ function diagnosticarSistemaAlertas() {
         activos.forEach(s => {
           diagnostico.push('    • ' + s[1] + ' a las ' +
                           ('0' + s[2]).slice(-2) + ':' + ('0' + s[3]).slice(-2));
+          data.programaciones.push({
+            dia: s[1],
+            hora: ('0' + s[2]).slice(-2) + ':' + ('0' + s[3]).slice(-2),
+            activo: true
+          });
         });
       }
     } else {
@@ -2121,6 +2428,10 @@ function diagnosticarSistemaAlertas() {
         const tipo = t.getEventType().toString();
         const func = t.getHandlerFunction();
         diagnostico.push('  - ' + func + ' (' + tipo + ')');
+        data.triggers.push({
+          funcion: func,
+          tipo: tipo
+        });
       });
     } else {
       diagnostico.push('⚠️ Triggers: NINGUNO');
@@ -2135,9 +2446,17 @@ function diagnosticarSistemaAlertas() {
     if (asistSheet && asistSheet.getLastRow() > 1) {
       const totalRegistros = asistSheet.getLastRow() - 1;
       diagnostico.push('✅ Registros: ' + totalRegistros + ' total(es)');
+      data.asistencia = {
+        tieneRegistros: true,
+        total: totalRegistros
+      };
     } else {
       diagnostico.push('❌ Registros: NINGUNO');
       diagnostico.push('  → Registra asistencia para poder generar alertas');
+      data.asistencia = {
+        tieneRegistros: false,
+        total: 0
+      };
     }
 
     diagnostico.push('');
@@ -2158,15 +2477,14 @@ function diagnosticarSistemaAlertas() {
     hojaD.setColumnWidth(1, 600);
     hojaD.getRange(1, 1, dataRows.length, 1).setWrap(true);
 
-    ui.showSidebar(HtmlService.createHtmlOutput(
-      '✅ Diagnóstico completado.<br><br>Revisa la hoja «Diagnostico_Sistema» para ver los resultados.'
-    ).setWidth(250));
-
-    return { success: true, message: '✅ Diagnóstico completado' };
+    return {
+      success: true,
+      message: '✅ Diagnóstico completado. Revisa la hoja "Diagnostico_Sistema" para ver los resultados.',
+      data: data
+    };
 
   } catch (error) {
     Logger.log('Error en diagnosticarSistemaAlertas: ' + error);
-    SpreadsheetApp.getUi().alert('❌ Error al diagnosticar: ' + error.message);
     return { success: false, message: 'Error: ' + error.message };
   }
 }
