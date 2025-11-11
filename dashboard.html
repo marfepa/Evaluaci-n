@@ -2550,51 +2550,101 @@
     // ============================================================================
 
     async function generateSituationReport() {
-      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
-      if (!isModalMode) {
-        showError(
-          'Función no disponible en Web App',
-          'Esta función requiere la interfaz de Google Sheets. Redirigiendo...'
-        );
-        setTimeout(() => {
-          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
-        }, 1500);
-        return;
-      }
-
-      showLoading('Generando reporte de notas por situación...');
+      showLoading('Obteniendo cursos y situaciones...');
 
       try {
-        const response = await callBackend('reporteNotasSituacion');
+        // Obtener el mapping de cursos y situaciones
+        const mappingResponse = await callBackend('getCursosSituacionesMapping');
         hideLoading();
 
-        if (response && response.success) {
-          showSuccess(response.message || 'Reporte generado exitosamente');
-        } else if (response && response.message) {
-          // Backend may not return success flag for some functions
-          showSuccess(response.message);
-        } else {
-          showError('No se pudo generar el reporte', 'Esta función puede requerir interacción adicional');
+        if (!mappingResponse || !mappingResponse.success) {
+          showError('Error', mappingResponse?.message || 'No se pudo obtener la lista de cursos y situaciones');
+          return;
         }
+
+        const mapping = mappingResponse.data;
+        const cursos = Object.keys(mapping).sort();
+
+        if (cursos.length === 0) {
+          showError('Sin datos', 'No hay cursos con situaciones disponibles');
+          return;
+        }
+
+        // Crear diálogo para seleccionar curso y situación
+        const dialog = document.createElement('div');
+        dialog.className = 'modal';
+        dialog.style.display = 'flex';
+        dialog.innerHTML = `
+          <div class="modal-content" style="max-width: 500px;">
+            <h3>Generar Reporte de Notas por Situación</h3>
+            <div class="form-group">
+              <label for="select-curso">Curso:</label>
+              <select id="select-curso" class="form-control">
+                ${cursos.map(c => `<option value="${c}">${c}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="select-situacion">Situación:</label>
+              <select id="select-situacion" class="form-control">
+              </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+              <button class="btn btn-primary" id="btn-generar-notas">Generar Reporte</button>
+              <button class="btn btn-outline" id="btn-cancelar-notas">Cancelar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(dialog);
+
+        const cursoSelect = document.getElementById('select-curso');
+        const situacionSelect = document.getElementById('select-situacion');
+
+        // Función para actualizar situaciones basado en curso seleccionado
+        function updateSituaciones() {
+          const selectedCurso = cursoSelect.value;
+          const situaciones = mapping[selectedCurso] || [];
+          situacionSelect.innerHTML = situaciones.map(s =>
+            `<option value="${s}">${s}</option>`
+          ).join('');
+        }
+
+        cursoSelect.addEventListener('change', updateSituaciones);
+        updateSituaciones();
+
+        // Manejar generación
+        document.getElementById('btn-generar-notas').addEventListener('click', async () => {
+          const curso = cursoSelect.value;
+          const situacion = situacionSelect.value;
+
+          dialog.remove();
+          showLoading('Generando reporte...');
+
+          try {
+            const response = await callBackend('generateReporteNotasSituacion', curso, situacion);
+            hideLoading();
+
+            if (response && response.success) {
+              showSuccess(response.message);
+            } else {
+              showError('Error', response?.message || 'No se pudo generar el reporte');
+            }
+          } catch (err) {
+            hideLoading();
+            showError('Error al generar reporte', err.message);
+          }
+        });
+
+        document.getElementById('btn-cancelar-notas').addEventListener('click', () => {
+          dialog.remove();
+        });
+
       } catch (err) {
         hideLoading();
-        showError('Error al generar reporte', err.message);
+        showError('Error', err.message);
       }
     }
 
     async function generateAdvancedAttendanceReport() {
-      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
-      if (!isModalMode) {
-        showError(
-          'Función no disponible en Web App',
-          'El reporte avanzado requiere la interfaz de Google Sheets. Redirigiendo...'
-        );
-        setTimeout(() => {
-          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
-        }, 1500);
-        return;
-      }
-
       showLoading('Generando reporte avanzado de asistencia...');
 
       try {
@@ -2603,10 +2653,16 @@
 
         if (response && response.success) {
           showSuccess(response.message || 'Reporte generado exitosamente');
-        } else if (response && response.message) {
-          showSuccess(response.message);
+
+          // Mostrar estadísticas si están disponibles
+          if (response.data) {
+            const { global, cursos, estudiantes } = response.data;
+            console.log('Estadísticas globales:', global);
+            console.log('Estadísticas por curso:', cursos);
+            console.log('Estadísticas por estudiante:', estudiantes);
+          }
         } else {
-          showError('No se pudo generar el reporte', 'Esta función puede requerir interacción adicional');
+          showError('Error', response?.message || 'No se pudo generar el reporte');
         }
       } catch (err) {
         hideLoading();
@@ -2615,35 +2671,158 @@
     }
 
     async function calculateWeightedAverage() {
-      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
-      if (!isModalMode) {
-        showError(
-          'Función no disponible en Web App',
-          'Esta función requiere la interfaz de Google Sheets para ingresar pesos. Redirigiendo...'
-        );
-        setTimeout(() => {
-          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
-        }, 1500);
-        return;
-      }
-
-      showLoading('Calculando medias ponderadas...');
+      showLoading('Obteniendo hojas de reporte...');
 
       try {
-        const response = await callBackend('calculaMediaPonderadaDesdeHoja');
+        // Paso 1: Obtener hojas disponibles
+        const hojasResponse = await callBackend('getHojasReportes');
         hideLoading();
 
-        if (response && response.success) {
-          showSuccess(response.message || 'Cálculo completado exitosamente');
-          loadStats(); // Refresh stats after calculation
-        } else if (response && response.message) {
-          showSuccess(response.message);
-        } else {
-          showError('No se pudo completar el cálculo', 'Esta función puede requerir interacción adicional');
+        if (!hojasResponse || !hojasResponse.success) {
+          showError('Error', hojasResponse?.message || 'No se pudieron obtener las hojas de reporte');
+          return;
         }
+
+        const hojas = hojasResponse.data;
+
+        // Crear diálogo para seleccionar hoja
+        const dialog1 = document.createElement('div');
+        dialog1.className = 'modal';
+        dialog1.style.display = 'flex';
+        dialog1.innerHTML = `
+          <div class="modal-content" style="max-width: 500px;">
+            <h3>Calcular Medias Ponderadas</h3>
+            <p>Selecciona la hoja de reporte:</p>
+            <div class="form-group">
+              <select id="select-hoja-reporte" class="form-control">
+                ${hojas.map(h => `<option value="${h}">${h}</option>`).join('')}
+              </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+              <button class="btn btn-primary" id="btn-siguiente-hoja">Siguiente</button>
+              <button class="btn btn-outline" id="btn-cancelar-hoja">Cancelar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(dialog1);
+
+        document.getElementById('btn-cancelar-hoja').addEventListener('click', () => {
+          dialog1.remove();
+        });
+
+        document.getElementById('btn-siguiente-hoja').addEventListener('click', async () => {
+          const nombreHoja = document.getElementById('select-hoja-reporte').value;
+          dialog1.remove();
+
+          // Paso 2: Obtener instrumentos de la hoja seleccionada
+          showLoading('Obteniendo instrumentos...');
+
+          try {
+            const instResponse = await callBackend('getInstrumentosDeReporte', nombreHoja);
+            hideLoading();
+
+            if (!instResponse || !instResponse.success) {
+              showError('Error', instResponse?.message || 'No se pudieron obtener los instrumentos');
+              return;
+            }
+
+            const instrumentos = instResponse.data.instrumentos;
+
+            // Crear diálogo para ingresar pesos
+            const dialog2 = document.createElement('div');
+            dialog2.className = 'modal';
+            dialog2.style.display = 'flex';
+            dialog2.innerHTML = `
+              <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+                <h3>Pesos de Instrumentos</h3>
+                <p><strong>Hoja:</strong> ${nombreHoja}</p>
+                <p>Ingresa el peso (%) para cada instrumento:</p>
+                <div id="instrumentos-container">
+                  ${instrumentos.map(inst => `
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                      <label style="flex: 1; margin: 0;">${inst}:</label>
+                      <input type="number"
+                             id="peso-${inst.replace(/[^a-zA-Z0-9]/g, '_')}"
+                             class="form-control peso-input"
+                             data-instrumento="${inst}"
+                             placeholder="0-100"
+                             min="0"
+                             max="100"
+                             step="0.1"
+                             style="width: 120px;">
+                      <span>%</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                  <button class="btn btn-primary" id="btn-calcular-pesos">Calcular</button>
+                  <button class="btn btn-outline" id="btn-cancelar-pesos">Cancelar</button>
+                </div>
+              </div>
+            `;
+            document.body.appendChild(dialog2);
+
+            document.getElementById('btn-cancelar-pesos').addEventListener('click', () => {
+              dialog2.remove();
+            });
+
+            document.getElementById('btn-calcular-pesos').addEventListener('click', async () => {
+              // Recopilar pesos
+              const pesos = {};
+              const inputs = document.querySelectorAll('.peso-input');
+              let valid = true;
+
+              inputs.forEach(input => {
+                const inst = input.getAttribute('data-instrumento');
+                const valor = input.value.trim();
+
+                if (!valor) {
+                  showError('Error', `Falta el peso para: ${inst}`);
+                  valid = false;
+                  return;
+                }
+
+                const peso = parseFloat(valor);
+                if (isNaN(peso) || peso < 0) {
+                  showError('Error', `Peso inválido para ${inst}: ${valor}`);
+                  valid = false;
+                  return;
+                }
+
+                pesos[inst] = peso;
+              });
+
+              if (!valid) return;
+
+              dialog2.remove();
+
+              // Paso 3: Calcular medias ponderadas
+              showLoading('Calculando medias ponderadas...');
+
+              try {
+                const calcResponse = await callBackend('calcularMediaPonderada', nombreHoja, pesos);
+                hideLoading();
+
+                if (calcResponse && calcResponse.success) {
+                  showSuccess(calcResponse.message || 'Medias ponderadas calculadas exitosamente');
+                } else {
+                  showError('Error', calcResponse?.message || 'No se pudo calcular las medias');
+                }
+              } catch (err) {
+                hideLoading();
+                showError('Error al calcular', err.message);
+              }
+            });
+
+          } catch (err) {
+            hideLoading();
+            showError('Error', err.message);
+          }
+        });
+
       } catch (err) {
         hideLoading();
-        showError('Error al calcular medias ponderadas', err.message);
+        showError('Error', err.message);
       }
     }
 
