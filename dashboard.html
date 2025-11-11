@@ -2919,10 +2919,7 @@
       try {
         await callBackend('diagnosticarSistemaAlertas');
         hideLoading();
-        showSuccess(
-          'Diagnóstico completado',
-          'Revisa la ventana emergente con los resultados del diagnóstico.'
-        );
+        showSuccess('Diagnóstico completado. Revisa la ventana emergente con los resultados del diagnóstico.');
       } catch (err) {
         hideLoading();
         showError('Error al ejecutar diagnóstico', err.message);
@@ -2973,10 +2970,7 @@
       try {
         await callBackend('testAlertSystem');
         hideLoading();
-        showSuccess(
-          'Prueba completada',
-          'Revisa los logs (Ver > Registros) para ver los resultados de la prueba.'
-        );
+        showSuccess('Prueba completada. Revisa los logs (Ver > Registros) para ver los resultados de la prueba.');
       } catch (err) {
         hideLoading();
         showError('Error al ejecutar prueba', err.message);
@@ -3076,10 +3070,7 @@
       try {
         await callBackend('resetConfig');
         hideLoading();
-        showSuccess(
-          'Configuración reseteada',
-          'La configuración de alertas ha sido restaurada a los valores por defecto.'
-        );
+        showSuccess('Configuración reseteada. La configuración de alertas ha sido restaurada a los valores por defecto.');
       } catch (err) {
         hideLoading();
         showError('Error al resetear configuración', err.message);
@@ -3099,10 +3090,7 @@
       try {
         await callBackend('clearAllCache');
         hideLoading();
-        showSuccess(
-          'Caché limpiado',
-          'Todo el caché ha sido eliminado. El sistema volverá a cargarlo automáticamente según sea necesario.'
-        );
+        showSuccess('Caché limpiado. Todo el caché ha sido eliminado. El sistema volverá a cargarlo automáticamente según sea necesario.');
       } catch (err) {
         hideLoading();
         showError('Error al limpiar caché', err.message);
@@ -3130,10 +3118,7 @@
       try {
         await callBackend('resetEmailBlock');
         hideLoading();
-        showSuccess(
-          'Bloqueo reseteado',
-          'El bloqueo anti-spam ha sido eliminado. Ahora se pueden enviar emails de alertas.'
-        );
+        showSuccess('Bloqueo reseteado. El bloqueo anti-spam ha sido eliminado. Ahora se pueden enviar emails de alertas.');
       } catch (err) {
         hideLoading();
         showError('Error al resetear bloqueo', err.message);
@@ -3161,10 +3146,7 @@
       try {
         await callBackend('forceEmailNow');
         hideLoading();
-        showSuccess(
-          'Email enviado',
-          'El email de alertas ha sido enviado a los destinatarios configurados.'
-        );
+        showSuccess('Email enviado. El email de alertas ha sido enviado a los destinatarios configurados.');
       } catch (err) {
         hideLoading();
         showError('Error al enviar email', err.message);
@@ -3191,10 +3173,7 @@
       try {
         await callBackend('reportePorEstudianteOptimizado');
         hideLoading();
-        showSuccess(
-          'Reporte generado',
-          'El reporte optimizado de asistencia por estudiante ha sido creado en una nueva hoja.'
-        );
+        showSuccess('Reporte generado. El reporte optimizado de asistencia por estudiante ha sido creado en una nueva hoja.');
       } catch (err) {
         hideLoading();
         showError('Error al generar reporte', err.message);
@@ -3218,10 +3197,7 @@
       try {
         await callBackend('reportePorCursoOptimizado');
         hideLoading();
-        showSuccess(
-          'Reporte generado',
-          'El reporte optimizado de asistencia por curso ha sido creado en una nueva hoja.'
-        );
+        showSuccess('Reporte generado. El reporte optimizado de asistencia por curso ha sido creado en una nueva hoja.');
       } catch (err) {
         hideLoading();
         showError('Error al generar reporte', err.message);
@@ -3245,10 +3221,7 @@
       try {
         await callBackend('compararEstudiantesOptimizado');
         hideLoading();
-        showSuccess(
-          'Comparación generada',
-          'La comparación optimizada de estudiantes ha sido creada en una nueva hoja.'
-        );
+        showSuccess('Comparación generada. La comparación optimizada de estudiantes ha sido creada en una nueva hoja.');
       } catch (err) {
         hideLoading();
         showError('Error al generar comparación', err.message);
@@ -3272,10 +3245,7 @@
       try {
         await callBackend('compararCursosOptimizado');
         hideLoading();
-        showSuccess(
-          'Comparación generada',
-          'La comparación optimizada de cursos ha sido creada en una nueva hoja.'
-        );
+        showSuccess('Comparación generada. La comparación optimizada de cursos ha sido creada en una nueva hoja.');
       } catch (err) {
         hideLoading();
         showError('Error al generar comparación', err.message);
