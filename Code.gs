@@ -1156,108 +1156,135 @@ function recordRubricaPeerGrade(formData) {
  *  REPORTES DE NOTAS POR SITUACIÓN                             *
  ****************************************************************/
 function reporteNotasSituacion() {
-  const ui = SpreadsheetApp.getUi();
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
-  // Verificar que la hoja existe
-  const sheet = ss.getSheetByName('CalificacionesDetalladas');
-  if (!sheet) {
-    ui.alert('⚠️ Error', 'La hoja "CalificacionesDetalladas" no existe.', ui.ButtonSet.OK);
-    return;
-  }
-
-  const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
-
-  // Verificar que hay datos
-  if (!values || values.length === 0) {
-    ui.alert('⚠️ Sin datos', 'La hoja "CalificacionesDetalladas" está vacía.', ui.ButtonSet.OK);
-    return;
-  }
-
-  const idxC = headers.indexOf('CursoEvaluado');
-  const idxS = headers.indexOf('NombreSituacion');
-
-  // Verificar que las columnas existen
-  if (idxC === -1 || idxS === -1) {
-    ui.alert('⚠️ Error',
-      'No se encontraron las columnas necesarias:\n' +
-      (idxC === -1 ? '- CursoEvaluado\n' : '') +
-      (idxS === -1 ? '- NombreSituacion\n' : ''),
-      ui.ButtonSet.OK);
-    return;
-  }
-
-  const mapping = {};
-  values.forEach(r => {
-    const curso = r[idxC], sit = r[idxS];
-    if (curso && sit) {  // Solo agregar si ambos valores existen
-      if (!mapping[curso]) mapping[curso] = [];
-      if (mapping[curso].indexOf(sit) < 0) mapping[curso].push(sit);
+    // Verificar que la hoja existe
+    const sheet = ss.getSheetByName('CalificacionesDetalladas');
+    if (!sheet) {
+      ui.alert('⚠️ Error', 'La hoja "CalificacionesDetalladas" no existe.', ui.ButtonSet.OK);
+      return;
     }
-  });
-  Object.values(mapping).forEach(arr => arr.sort());
-  const cursos = Object.keys(mapping).sort();
 
-  // Verificar que hay cursos disponibles
-  if (cursos.length === 0) {
-    ui.alert('⚠️ Sin datos', 'No hay cursos con situaciones disponibles en "CalificacionesDetalladas".', ui.ButtonSet.OK);
-    return;
-  }
+    // Leer datos directamente sin caché para evitar problemas
+    const allData = sheet.getDataRange().getValues();
+    if (!allData || allData.length < 2) {
+      ui.alert('⚠️ Sin datos', 'La hoja "CalificacionesDetalladas" está vacía.', ui.ButtonSet.OK);
+      return;
+    }
 
-  const html = HtmlService.createHtmlOutput(`
-    <!DOCTYPE html>
-    <html>
-    <head><base target="_top">
-      <script>
-        const mapping = ${JSON.stringify(mapping)};
-        document.addEventListener('DOMContentLoaded', () => {
-          const cursoSel = document.getElementById('curso');
-          const sitSel   = document.getElementById('situacion');
-          function updateSituaciones() {
-            const opts = mapping[cursoSel.value] || [];
-            sitSel.innerHTML = opts.map(s => '<option value="'+s+'">'+s+'</option>').join('');
-          }
-          cursoSel.addEventListener('change', updateSituaciones);
-          updateSituaciones();
-          document.getElementById('generar').addEventListener('click', () => {
-            const btn = document.getElementById('generar');
-            btn.disabled = true;
-            btn.textContent = 'Generando...';
+    const headers = allData[0];
+    const values = allData.slice(1);
 
-            google.script.run
-              .withSuccessHandler((result) => {
-                if (result && result.success) {
-                  alert('✅ ' + result.message);
-                  google.script.host.close();
-                } else {
-                  alert('⚠️ ' + (result ? result.message : 'Error desconocido'));
+    const idxC = headers.indexOf('CursoEvaluado');
+    const idxS = headers.indexOf('NombreSituacion');
+
+    // Verificar que las columnas existen
+    if (idxC === -1 || idxS === -1) {
+      ui.alert('⚠️ Error',
+        'No se encontraron las columnas necesarias:\n' +
+        (idxC === -1 ? '- CursoEvaluado\n' : '') +
+        (idxS === -1 ? '- NombreSituacion\n' : ''),
+        ui.ButtonSet.OK);
+      return;
+    }
+
+    // Crear mapping simple (curso -> array de situaciones)
+    const mapping = {};
+    values.forEach(r => {
+      const curso = String(r[idxC] || '').trim();
+      const sit = String(r[idxS] || '').trim();
+      if (curso && sit) {
+        if (!mapping[curso]) mapping[curso] = [];
+        if (mapping[curso].indexOf(sit) < 0) {
+          mapping[curso].push(sit);
+        }
+      }
+    });
+
+    // Ordenar situaciones dentro de cada curso
+    Object.keys(mapping).forEach(curso => {
+      mapping[curso].sort();
+    });
+
+    const cursos = Object.keys(mapping).sort();
+
+    // Verificar que hay cursos disponibles
+    if (cursos.length === 0) {
+      ui.alert('⚠️ Sin datos', 'No hay cursos con situaciones disponibles en "CalificacionesDetalladas".', ui.ButtonSet.OK);
+      return;
+    }
+
+    // Serializar mapping de forma segura
+    let mappingJson;
+    try {
+      mappingJson = JSON.stringify(mapping);
+    } catch (e) {
+      Logger.log('Error serializando mapping: ' + e.message);
+      ui.alert('⚠️ Error', 'Error al procesar los datos. Por favor contacta al administrador.', ui.ButtonSet.OK);
+      return;
+    }
+
+    const html = HtmlService.createHtmlOutput(`
+      <!DOCTYPE html>
+      <html>
+      <head><base target="_top">
+        <script>
+          const mapping = ${mappingJson};
+          document.addEventListener('DOMContentLoaded', () => {
+            const cursoSel = document.getElementById('curso');
+            const sitSel   = document.getElementById('situacion');
+            function updateSituaciones() {
+              const opts = mapping[cursoSel.value] || [];
+              sitSel.innerHTML = opts.map(s => '<option value="'+s+'">'+s+'</option>').join('');
+            }
+            cursoSel.addEventListener('change', updateSituaciones);
+            updateSituaciones();
+            document.getElementById('generar').addEventListener('click', () => {
+              const btn = document.getElementById('generar');
+              btn.disabled = true;
+              btn.textContent = 'Generando...';
+
+              google.script.run
+                .withSuccessHandler((result) => {
+                  if (result && result.success) {
+                    alert('✅ ' + result.message);
+                    google.script.host.close();
+                  } else {
+                    alert('⚠️ ' + (result ? result.message : 'Error desconocido'));
+                    btn.disabled = false;
+                    btn.textContent = 'Generar';
+                  }
+                })
+                .withFailureHandler(err => {
+                  alert('❌ ERROR: ' + err.message);
                   btn.disabled = false;
                   btn.textContent = 'Generar';
-                }
-              })
-              .withFailureHandler(err => {
-                alert('❌ ERROR: ' + err.message);
-                btn.disabled = false;
-                btn.textContent = 'Generar';
-              })
-              .generateReporteNotasSituacion(cursoSel.value, sitSel.value);
+                })
+                .generateReporteNotasSituacion(cursoSel.value, sitSel.value);
+            });
           });
-        });
-      </script>
-    </head>
-    <body style="font-family:sans-serif;padding:12px">
-      <label>Curso:<br>
-        <select id="curso">${cursos.map(c => `<option value="${c}">${c}</option>`).join('')}</select>
-      </label><br><br>
-      <label>Situación:<br>
-        <select id="situacion"></select>
-      </label><br><br>
-      <button id="generar" type="button">Generar</button>
-    </body>
-    </html>
-  `).setWidth(340).setHeight(260);
+        </script>
+      </head>
+      <body style="font-family:sans-serif;padding:12px">
+        <label>Curso:<br>
+          <select id="curso">${cursos.map(c => `<option value="${c}">${c}</option>`).join('')}</select>
+        </label><br><br>
+        <label>Situación:<br>
+          <select id="situacion"></select>
+        </label><br><br>
+        <button id="generar" type="button">Generar</button>
+      </body>
+      </html>
+    `).setWidth(340).setHeight(260);
 
-  ui.showModalDialog(html, 'Selecciona Reporte de Notas');
+    ui.showModalDialog(html, 'Selecciona Reporte de Notas');
+
+  } catch (error) {
+    Logger.log('Error en reporteNotasSituacion: ' + error.toString());
+    SpreadsheetApp.getUi().alert('⚠️ Error', 'Error al abrir el diálogo: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
 }
 
 function generateReporteNotasSituacion(curso, situacion) {
@@ -1268,7 +1295,20 @@ function generateReporteNotasSituacion(curso, situacion) {
     }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
+    const sheet = ss.getSheetByName('CalificacionesDetalladas');
+
+    if (!sheet) {
+      return { success: false, message: 'La hoja "CalificacionesDetalladas" no existe.' };
+    }
+
+    // Leer datos directamente sin caché
+    const allData = sheet.getDataRange().getValues();
+    if (!allData || allData.length < 2) {
+      return { success: false, message: 'La hoja "CalificacionesDetalladas" está vacía.' };
+    }
+
+    const headers = allData[0];
+    const values = allData.slice(1);
 
     // Verificar columnas necesarias
     const iE = headers.indexOf('NombreEstudiante');
@@ -1285,8 +1325,13 @@ function generateReporteNotasSituacion(curso, situacion) {
       };
     }
 
-    // Filtrar datos
-    const datos = values.filter(r => r[iC] === curso && r[iS] === situacion);
+    // Filtrar datos por curso y situación
+    const datos = values.filter(r => {
+      const cursoVal = String(r[iC] || '').trim();
+      const sitVal = String(r[iS] || '').trim();
+      return cursoVal === curso && sitVal === situacion;
+    });
+
     if (!datos.length) {
       return {
         success: false,
@@ -1294,7 +1339,7 @@ function generateReporteNotasSituacion(curso, situacion) {
       };
     }
 
-    // Agrupar datos
+    // Agrupar datos por estudiante, instrumento y fecha
     const agrup = {};
     datos.forEach(r => {
       const est   = r[iE];
@@ -1303,8 +1348,10 @@ function generateReporteNotasSituacion(curso, situacion) {
       const key   = `${est}│${inst}│${fecha}`;
       const cal   = parseFloat(r[iT]) || 0;
       if (!agrup[key]) agrup[key] = { est, inst, fecha, sum: 0, cnt: 0 };
-      agrup[key].sum += cal; agrup[key].cnt++;
+      agrup[key].sum += cal;
+      agrup[key].cnt++;
     });
+
     const filas = Object.values(agrup).map(o => [o.est, o.inst, o.fecha, (o.sum / o.cnt).toFixed(2)]);
 
     // Crear o reemplazar hoja
