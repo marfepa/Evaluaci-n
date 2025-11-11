@@ -1449,9 +1449,19 @@ function generateReporteNotasSituacion(curso, situacion) {
     hoja.autoResizeColumns(1, 4);
     ss.setActiveSheet(hoja);
 
+    // Preparar datos estructurados para la UI
+    const reportData = filas.map(fila => ({
+      Estudiante: fila[0],
+      Instrumento: fila[1],
+      Fecha: fila[2],
+      Calificación: fila[3]
+    }));
+
     return {
       success: true,
-      message: `Reporte generado con ${filas.length} registro(s) en la hoja "${nombreHoja}".`
+      message: `Reporte generado con ${filas.length} registro(s) en la hoja "${nombreHoja}".`,
+      data: reportData,
+      sheetName: nombreHoja
     };
 
   } catch (error) {
@@ -2350,6 +2360,124 @@ function reporteAsistenciaAvanzada_UI() {
 
   } catch (error) {
     Logger.log('Error en reporteAsistenciaAvanzada_UI: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Lista todos los reportes existentes en el spreadsheet
+ * Identifica reportes por el patrón de nombre de las pestañas
+ */
+function listarReportesExistentes() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheets = ss.getSheets();
+
+    const reportes = [];
+
+    sheets.forEach(sheet => {
+      const nombre = sheet.getName();
+      let tipo = null;
+      let info = {};
+
+      // Identificar reportes de notas (formato: "RepNotas CURSO-SITUACION")
+      if (nombre.startsWith('RepNotas ')) {
+        tipo = 'notas';
+        const resto = nombre.substring(9); // Quitar "RepNotas "
+        const dashIndex = resto.indexOf('-');
+        if (dashIndex > 0) {
+          info = {
+            curso: resto.substring(0, dashIndex).trim(),
+            situacion: resto.substring(dashIndex + 1).trim()
+          };
+        }
+      }
+      // Identificar reporte avanzado de asistencia
+      else if (nombre === 'Reporte_Avanzado_Asistencia') {
+        tipo = 'asistencia_avanzada';
+        info = { descripcion: 'Reporte completo de asistencia con estadísticas' };
+      }
+      // Identificar otros reportes de asistencia
+      else if (nombre.startsWith('Reporte_Asistencia_')) {
+        tipo = 'asistencia';
+        const fecha = nombre.substring(19); // Quitar "Reporte_Asistencia_"
+        info = { fecha: fecha };
+      }
+      // Identificar comparativas de calificaciones
+      else if (nombre === 'Comparativa_Calificaciones_Cursos') {
+        tipo = 'comparativa';
+        info = { descripcion: 'Comparativa entre cursos' };
+      }
+
+      if (tipo) {
+        reportes.push({
+          nombre: nombre,
+          tipo: tipo,
+          info: info,
+          ultimaModificacion: sheet.getLastUpdated()
+        });
+      }
+    });
+
+    // Ordenar por fecha de modificación (más reciente primero)
+    reportes.sort((a, b) => b.ultimaModificacion - a.ultimaModificacion);
+
+    return {
+      success: true,
+      data: reportes
+    };
+
+  } catch (error) {
+    Logger.log('Error en listarReportesExistentes: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Lee los datos de un reporte existente por nombre de hoja
+ */
+function leerReporteExistente(nombreHoja) {
+  try {
+    if (!nombreHoja) {
+      return { success: false, message: 'Debe especificar el nombre de la hoja' };
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(nombreHoja);
+
+    if (!sheet) {
+      return { success: false, message: 'No se encontró la hoja "' + nombreHoja + '"' };
+    }
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow < 2) {
+      return { success: false, message: 'La hoja no contiene datos' };
+    }
+
+    // Leer encabezados y datos
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    // Convertir a objetos
+    const data = values.map(row => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = row[index];
+      });
+      return obj;
+    });
+
+    return {
+      success: true,
+      data: data,
+      headers: headers,
+      sheetName: nombreHoja
+    };
+
+  } catch (error) {
+    Logger.log('Error en leerReporteExistente: ' + error);
     return { success: false, message: 'Error: ' + error.message };
   }
 }

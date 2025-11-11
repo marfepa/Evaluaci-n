@@ -185,6 +185,7 @@
 
     .card-icon.primary { background: linear-gradient(135deg, var(--primary-light), var(--primary)); color: white; }
     .card-icon.secondary { background: linear-gradient(135deg, #34d399, var(--secondary)); color: white; }
+    .card-icon.success { background: linear-gradient(135deg, #34d399, #10b981); color: white; }
     .card-icon.warning { background: linear-gradient(135deg, #fbbf24, var(--warning)); color: white; }
     .card-icon.danger { background: linear-gradient(135deg, #f87171, var(--danger)); color: white; }
 
@@ -232,6 +233,17 @@
     }
 
     .btn-secondary:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
       background: #059669;
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
@@ -1186,6 +1198,21 @@
           </div>
           <button class="btn btn-outline" onclick="exportData()">
             Exportar
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon success">📋</div>
+            <div>
+              <div class="card-title">Consultar Reportes Existentes</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Visualiza reportes ya generados sin duplicar información.
+          </div>
+          <button class="btn btn-success" onclick="viewExistingReports()">
+            Ver Reportes
           </button>
         </div>
       </div>
@@ -2625,6 +2652,14 @@
 
             if (response && response.success) {
               showSuccess(response.message);
+
+              // Mostrar los datos del reporte en el modal
+              if (response.data && response.data.length > 0) {
+                showReportResults(
+                  `Reporte de Notas: ${curso} - ${situacion}`,
+                  response.data
+                );
+              }
             } else {
               showError('Error', response?.message || 'No se pudo generar el reporte');
             }
@@ -2657,9 +2692,96 @@
           // Mostrar estadísticas si están disponibles
           if (response.data) {
             const { global, cursos, estudiantes } = response.data;
-            console.log('Estadísticas globales:', global);
-            console.log('Estadísticas por curso:', cursos);
-            console.log('Estadísticas por estudiante:', estudiantes);
+
+            // Crear estructura de datos para visualizar
+            const reportData = {
+              'Estadísticas Globales': {
+                'Total de registros': global.totalRegistros,
+                'Total presentes': global.totalPresentes,
+                'Total ausentes': global.totalAusentes,
+                'Porcentaje de asistencia': global.porcentajeGlobal + '%'
+              },
+              'Por Curso': cursos,
+              'Por Estudiante': estudiantes.slice(0, 20) // Mostrar los primeros 20 estudiantes
+            };
+
+            // Crear HTML personalizado para mostrar las tres secciones
+            const body = document.getElementById('reportResultsBody');
+            body.innerHTML = `
+              <div style="margin-bottom: 20px;">
+                <h4 style="color: #2563eb; margin-bottom: 10px;">📊 Estadísticas Globales</h4>
+                <div class="table-container">
+                  <table>
+                    <tbody>
+                      <tr><th style="width: 50%; text-align: left;">Total de registros</th><td>${global.totalRegistros}</td></tr>
+                      <tr><th style="width: 50%; text-align: left;">Total presentes</th><td>${global.totalPresentes}</td></tr>
+                      <tr><th style="width: 50%; text-align: left;">Total ausentes</th><td>${global.totalAusentes}</td></tr>
+                      <tr><th style="width: 50%; text-align: left;">Porcentaje de asistencia</th><td><strong>${global.porcentajeGlobal}%</strong></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style="margin-bottom: 20px;">
+                <h4 style="color: #2563eb; margin-bottom: 10px;">📚 Por Curso</h4>
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Curso</th>
+                        <th>Total</th>
+                        <th>Presentes</th>
+                        <th>Ausentes</th>
+                        <th>% Asistencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${cursos.map(c => `
+                        <tr>
+                          <td>${c.curso}</td>
+                          <td>${c.total}</td>
+                          <td>${c.presentes}</td>
+                          <td>${c.ausentes}</td>
+                          <td><strong>${c.porcentaje}%</strong></td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h4 style="color: #2563eb; margin-bottom: 10px;">👤 Por Estudiante (Primeros 20)</h4>
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Estudiante</th>
+                        <th>Total</th>
+                        <th>Presentes</th>
+                        <th>Ausentes</th>
+                        <th>% Asistencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${estudiantes.slice(0, 20).map(e => `
+                        <tr>
+                          <td>${e.estudiante}</td>
+                          <td>${e.total}</td>
+                          <td>${e.presentes}</td>
+                          <td>${e.ausentes}</td>
+                          <td><strong>${e.porcentaje}%</strong></td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+                ${estudiantes.length > 20 ? `<p style="margin-top: 10px; color: #64748b;"><em>Mostrando 20 de ${estudiantes.length} estudiantes. Ver hoja completa en el spreadsheet.</em></p>` : ''}
+              </div>
+            `;
+
+            document.getElementById('reportResultsTitle').textContent = 'Reporte Avanzado de Asistencia';
+            document.getElementById('reportResultsModal').style.display = 'flex';
           }
         } else {
           showError('Error', response?.message || 'No se pudo generar el reporte');
@@ -2667,6 +2789,131 @@
       } catch (err) {
         hideLoading();
         showError('Error al generar reporte', err.message);
+      }
+    }
+
+    async function viewExistingReports() {
+      showLoading('Obteniendo lista de reportes...');
+
+      try {
+        const response = await callBackend('listarReportesExistentes');
+        hideLoading();
+
+        if (!response || !response.success) {
+          showError('Error', response?.message || 'No se pudo obtener la lista de reportes');
+          return;
+        }
+
+        const reportes = response.data;
+
+        if (reportes.length === 0) {
+          showError('Sin reportes', 'No hay reportes generados todavía');
+          return;
+        }
+
+        // Crear diálogo para seleccionar reporte
+        const dialog = document.createElement('div');
+        dialog.className = 'modal';
+        dialog.style.display = 'flex';
+
+        // Agrupar reportes por tipo
+        const reportesPorTipo = {
+          notas: reportes.filter(r => r.tipo === 'notas'),
+          asistencia_avanzada: reportes.filter(r => r.tipo === 'asistencia_avanzada'),
+          asistencia: reportes.filter(r => r.tipo === 'asistencia'),
+          comparativa: reportes.filter(r => r.tipo === 'comparativa')
+        };
+
+        const formatFecha = (fecha) => {
+          try {
+            return new Date(fecha).toLocaleString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          } catch {
+            return 'Fecha desconocida';
+          }
+        };
+
+        const crearListaReportes = (listaReportes, titulo, icono) => {
+          if (listaReportes.length === 0) return '';
+          return `
+            <div style="margin-bottom: 20px;">
+              <h4 style="color: #2563eb; margin-bottom: 10px;">${icono} ${titulo}</h4>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${listaReportes.map(r => `
+                  <button
+                    class="btn btn-outline"
+                    style="text-align: left; padding: 12px; display: flex; justify-content: space-between; align-items: center;"
+                    onclick="loadReport('${r.nombre}')"
+                  >
+                    <div>
+                      <div style="font-weight: 600;">${r.nombre}</div>
+                      <div style="font-size: 0.85em; color: #64748b; margin-top: 4px;">
+                        ${r.tipo === 'notas' ? `${r.info.curso} - ${r.info.situacion}` : r.info.descripcion || r.info.fecha || ''}
+                      </div>
+                    </div>
+                    <div style="font-size: 0.8em; color: #94a3b8;">
+                      ${formatFecha(r.ultimaModificacion)}
+                    </div>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        };
+
+        dialog.innerHTML = `
+          <div class="modal-content" style="max-width: 700px; max-height: 85vh; overflow-y: auto;">
+            <h3>Reportes Existentes</h3>
+            <p style="color: #64748b; margin-bottom: 20px;">
+              Selecciona un reporte para visualizar sus datos
+            </p>
+
+            ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas', '📄')}
+            ${crearListaReportes(reportesPorTipo.asistencia_avanzada, 'Reportes Avanzados de Asistencia', '📊')}
+            ${crearListaReportes(reportesPorTipo.asistencia, 'Reportes de Asistencia', '✓')}
+            ${crearListaReportes(reportesPorTipo.comparativa, 'Comparativas', '📈')}
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+              <button class="btn btn-outline" id="btn-cancelar-reportes" style="flex: 1;">Cerrar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // Añadir manejadores
+        document.getElementById('btn-cancelar-reportes').addEventListener('click', () => {
+          dialog.remove();
+        });
+
+        // Función global para cargar reporte (se ejecuta cuando se hace click en un botón)
+        window.loadReport = async (nombreHoja) => {
+          dialog.remove();
+          showLoading('Cargando reporte...');
+
+          try {
+            const reportResponse = await callBackend('leerReporteExistente', nombreHoja);
+            hideLoading();
+
+            if (reportResponse && reportResponse.success) {
+              showReportResults(nombreHoja, reportResponse.data);
+            } else {
+              showError('Error', reportResponse?.message || 'No se pudo cargar el reporte');
+            }
+          } catch (err) {
+            hideLoading();
+            showError('Error al cargar reporte', err.message);
+          }
+        };
+
+      } catch (err) {
+        hideLoading();
+        showError('Error', err.message);
       }
     }
 
