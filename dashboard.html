@@ -2781,7 +2781,7 @@
             `;
 
             document.getElementById('reportResultsTitle').textContent = 'Reporte Avanzado de Asistencia';
-            document.getElementById('reportResultsModal').style.display = 'flex';
+            showModal('reportResultsModal');
           }
         } else {
           showError('Error', response?.message || 'No se pudo generar el reporte');
