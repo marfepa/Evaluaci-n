@@ -1828,6 +1828,18 @@
     }
 
     async function openSchedulerDialog() {
+      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
+      if (!isModalMode) {
+        showError(
+          'Función no disponible en Web App',
+          'El programador de alertas requiere la interfaz de Google Sheets. Redirigiendo...'
+        );
+        setTimeout(() => {
+          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
+        }, 1500);
+        return;
+      }
+
       showLoading('Cargando programador de alertas...');
       try {
         const response = await callBackend('openSchedulerDialog');
@@ -1846,6 +1858,18 @@
     }
 
     async function openConfigDialog() {
+      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
+      if (!isModalMode) {
+        showError(
+          'Función no disponible en Web App',
+          'La configuración de alertas requiere la interfaz de Google Sheets. Redirigiendo...'
+        );
+        setTimeout(() => {
+          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
+        }, 1500);
+        return;
+      }
+
       showLoading('Cargando configuración...');
       try {
         const response = await callBackend('openConfigDialog');
@@ -1863,6 +1887,18 @@
     }
 
     async function diagnosticarSistema() {
+      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
+      if (!isModalMode) {
+        showError(
+          'Función no disponible en Web App',
+          'El diagnóstico de sistema requiere la interfaz de Google Sheets. Redirigiendo...'
+        );
+        setTimeout(() => {
+          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
+        }, 1500);
+        return;
+      }
+
       showLoading('Ejecutando diagnóstico del sistema...');
       try {
         const response = await callBackend('diagnosticarSistemaAlertas');
@@ -2317,6 +2353,18 @@
     // ============================================================================
 
     async function generateSituationReport() {
+      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
+      if (!isModalMode) {
+        showError(
+          'Función no disponible en Web App',
+          'Esta función requiere la interfaz de Google Sheets. Redirigiendo...'
+        );
+        setTimeout(() => {
+          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
+        }, 1500);
+        return;
+      }
+
       showLoading('Generando reporte de notas por situación...');
 
       try {
@@ -2338,6 +2386,18 @@
     }
 
     async function generateAdvancedAttendanceReport() {
+      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
+      if (!isModalMode) {
+        showError(
+          'Función no disponible en Web App',
+          'El reporte avanzado requiere la interfaz de Google Sheets. Redirigiendo...'
+        );
+        setTimeout(() => {
+          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
+        }, 1500);
+        return;
+      }
+
       showLoading('Generando reporte avanzado de asistencia...');
 
       try {
@@ -2358,6 +2418,18 @@
     }
 
     async function calculateWeightedAverage() {
+      // ⚠️ Esta función requiere UI de Google Sheets - solo funciona en Modal Mode
+      if (!isModalMode) {
+        showError(
+          'Función no disponible en Web App',
+          'Esta función requiere la interfaz de Google Sheets para ingresar pesos. Redirigiendo...'
+        );
+        setTimeout(() => {
+          window.open('https://docs.google.com/spreadsheets/d/1WKVottJP88lQ-XxB2SLaLJc06aB5yQYw5peI-8WLaO0/', '_blank');
+        }, 1500);
+        return;
+      }
+
       showLoading('Calculando medias ponderadas...');
 
       try {
