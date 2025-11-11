@@ -2600,7 +2600,6 @@
         // Crear diálogo para seleccionar curso y situación
         const dialog = document.createElement('div');
         dialog.className = 'modal';
-        dialog.classList.add('active');
         dialog.innerHTML = `
           <div class="modal-content" style="max-width: 500px;">
             <h3>Generar Reporte de Notas por Situación</h3>
@@ -2622,6 +2621,7 @@
           </div>
         `;
         document.body.appendChild(dialog);
+        dialog.classList.add('active');
 
         const cursoSelect = document.getElementById('select-curso');
         const situacionSelect = document.getElementById('select-situacion');
@@ -2814,7 +2814,6 @@
         // Crear diálogo para seleccionar reporte
         const dialog = document.createElement('div');
         dialog.className = 'modal';
-        dialog.classList.add('active');
 
         // Agrupar reportes por tipo
         const reportesPorTipo = {
@@ -2885,6 +2884,7 @@
         `;
 
         document.body.appendChild(dialog);
+        dialog.classList.add('active');
 
         // Añadir manejadores
         document.getElementById('btn-cancelar-reportes').addEventListener('click', () => {
@@ -2935,7 +2935,6 @@
         // Crear diálogo para seleccionar hoja
         const dialog1 = document.createElement('div');
         dialog1.className = 'modal';
-        dialog1.classList.add('active');
         dialog1.innerHTML = `
           <div class="modal-content" style="max-width: 500px;">
             <h3>Calcular Medias Ponderadas</h3>
@@ -2952,6 +2951,7 @@
           </div>
         `;
         document.body.appendChild(dialog1);
+        dialog1.classList.add('active');
 
         document.getElementById('btn-cancelar-hoja').addEventListener('click', () => {
           dialog1.remove();
@@ -2978,7 +2978,6 @@
             // Crear diálogo para ingresar pesos
             const dialog2 = document.createElement('div');
             dialog2.className = 'modal';
-            dialog2.classList.add('active');
             dialog2.innerHTML = `
               <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
                 <h3>Pesos de Instrumentos</h3>
@@ -3008,6 +3007,7 @@
               </div>
             `;
             document.body.appendChild(dialog2);
+            dialog2.classList.add('active');
 
             document.getElementById('btn-cancelar-pesos').addEventListener('click', () => {
               dialog2.remove();
@@ -3095,7 +3095,6 @@
         // Crear diálogo para seleccionar reporte a exportar
         const dialog = document.createElement('div');
         dialog.className = 'modal';
-        dialog.classList.add('active');
 
         // Agrupar reportes por tipo
         const reportesPorTipo = {
@@ -3166,6 +3165,7 @@
         `;
 
         document.body.appendChild(dialog);
+        dialog.classList.add('active');
 
         // Añadir manejadores
         const btnCancelar = dialog.querySelector('#btn-cancelar-exportar');
