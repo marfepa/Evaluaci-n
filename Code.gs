@@ -2414,7 +2414,7 @@ function listarReportesExistentes() {
           nombre: nombre,
           tipo: tipo,
           info: info,
-          ultimaModificacion: sheet.getLastUpdated()
+          ultimaModificacion: ss.getLastUpdated()
         });
       }
     });
@@ -2478,6 +2478,91 @@ function leerReporteExistente(nombreHoja) {
 
   } catch (error) {
     Logger.log('Error en leerReporteExistente: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Exporta un reporte específico a PDF
+ * @param {string} nombreHoja - Nombre de la hoja a exportar
+ * @return {Object} URL de descarga del PDF o error
+ */
+function exportarReportePDF(nombreHoja) {
+  try {
+    if (!nombreHoja) {
+      return { success: false, message: 'Debe especificar el nombre de la hoja' };
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(nombreHoja);
+
+    if (!sheet) {
+      return { success: false, message: 'No se encontró la hoja "' + nombreHoja + '"' };
+    }
+
+    // Construir URL de exportación a PDF
+    const sheetId = sheet.getSheetId();
+    const url = ss.getUrl().replace(/edit$/, 'export?format=pdf&gid=' + sheetId);
+
+    return {
+      success: true,
+      url: url,
+      nombreArchivo: nombreHoja + '.pdf',
+      message: 'URL de descarga generada correctamente'
+    };
+
+  } catch (error) {
+    Logger.log('Error en exportarReportePDF: ' + error);
+    return { success: false, message: 'Error: ' + error.message };
+  }
+}
+
+/**
+ * Descarga un reporte como PDF (genera el blob)
+ * @param {string} nombreHoja - Nombre de la hoja a exportar
+ * @return {Object} Resultado con el blob del PDF
+ */
+function descargarReportePDF(nombreHoja) {
+  try {
+    if (!nombreHoja) {
+      return { success: false, message: 'Debe especificar el nombre de la hoja' };
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(nombreHoja);
+
+    if (!sheet) {
+      return { success: false, message: 'No se encontró la hoja "' + nombreHoja + '"' };
+    }
+
+    // Construir URL de exportación a PDF
+    const sheetId = sheet.getSheetId();
+    const url = ss.getUrl().replace(/edit$/, 'export?format=pdf&gid=' + sheetId);
+
+    // Obtener el PDF
+    const response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() !== 200) {
+      return {
+        success: false,
+        message: 'Error al generar el PDF: código ' + response.getResponseCode()
+      };
+    }
+
+    const blob = response.getBlob().setName(nombreHoja + '.pdf');
+
+    return {
+      success: true,
+      blob: blob,
+      nombreArchivo: nombreHoja + '.pdf',
+      message: 'PDF generado correctamente'
+    };
+
+  } catch (error) {
+    Logger.log('Error en descargarReportePDF: ' + error);
     return { success: false, message: 'Error: ' + error.message };
   }
 }
