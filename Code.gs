@@ -2373,9 +2373,16 @@ function listarReportesExistentes() {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sheets = ss.getSheets();
 
-    // Obtener la fecha de última modificación del archivo usando DriveApp
-    const file = DriveApp.getFileById(SPREADSHEET_ID);
-    const ultimaModificacion = file.getLastUpdated();
+    // Intentar obtener la fecha de última modificación del archivo usando DriveApp
+    // Si falla (por permisos), usar la fecha actual
+    let ultimaModificacion;
+    try {
+      const file = DriveApp.getFileById(SPREADSHEET_ID);
+      ultimaModificacion = file.getLastUpdated();
+    } catch (dateError) {
+      Logger.log('No se pudo obtener fecha de última modificación, usando fecha actual: ' + dateError);
+      ultimaModificacion = new Date();
+    }
 
     const reportes = [];
 
@@ -2394,18 +2401,42 @@ function listarReportesExistentes() {
             curso: resto.substring(0, dashIndex).trim(),
             situacion: resto.substring(dashIndex + 1).trim()
           };
+        } else {
+          info = { descripcion: resto.trim() };
         }
       }
-      // Identificar reporte avanzado de asistencia
+      // Identificar reportes avanzados de asistencia
+      else if (nombre === 'Reporte_Asistencia_Av') {
+        tipo = 'asistencia_avanzada';
+        info = { descripcion: 'Reporte avanzado de asistencia por curso' };
+      }
+      else if (nombre === 'Reporte_Asistencia_Av_Diario') {
+        tipo = 'asistencia_avanzada';
+        info = { descripcion: 'Reporte consolidado diario de asistencia' };
+      }
       else if (nombre === 'Reporte_Avanzado_Asistencia') {
         tipo = 'asistencia_avanzada';
         info = { descripcion: 'Reporte completo de asistencia con estadísticas' };
       }
-      // Identificar otros reportes de asistencia
+      // Identificar reportes de asistencia con fecha
       else if (nombre.startsWith('Reporte_Asistencia_')) {
         tipo = 'asistencia';
         const fecha = nombre.substring(19); // Quitar "Reporte_Asistencia_"
         info = { fecha: fecha };
+      }
+      // Identificar reporte de asistencia simple
+      else if (nombre === 'Reporte_Asistencia') {
+        tipo = 'asistencia';
+        info = { descripcion: 'Reporte de asistencia' };
+      }
+      // Identificar reportes de calificaciones
+      else if (nombre === 'Reporte_Calif_Estudiante') {
+        tipo = 'notas';
+        info = { descripcion: 'Reporte de calificaciones por estudiante' };
+      }
+      else if (nombre === 'Reporte_Calif_Curso') {
+        tipo = 'notas';
+        info = { descripcion: 'Reporte de calificaciones por curso' };
       }
       // Identificar comparativas de calificaciones
       else if (nombre === 'Comparativa_Calificaciones_Cursos') {
