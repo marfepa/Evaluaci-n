@@ -93,14 +93,25 @@ function doPost(e) {
 
     Logger.log(`Calling function: ${functionName} with args: ${JSON.stringify(args)}`);
 
-    // Verificar que la función existe y es llamable en el scope global
-    const globalFunc = (typeof globalThis !== 'undefined' ? globalThis : this)[functionName];
-    if (typeof globalFunc !== 'function') {
+    // ✅ Mejorado: Buscar la función en el contexto global de Apps Script
+    // Apps Script no tiene globalThis, pero podemos usar eval para acceder a funciones globales
+    let globalFunc;
+    try {
+      // Intentar acceder a la función directamente por nombre
+      globalFunc = eval(functionName);
+    } catch (evalError) {
+      Logger.log(`Could not eval function: ${evalError.message}`);
       throw new Error(`Function ${functionName} not found or not callable`);
+    }
+
+    if (typeof globalFunc !== 'function') {
+      throw new Error(`${functionName} is not a function (type: ${typeof globalFunc})`);
     }
 
     // Llamar a la función con los argumentos
     const result = globalFunc.apply(null, args);
+
+    Logger.log(`Function ${functionName} executed successfully`);
 
     // Retornar el resultado como JSON
     return ContentService
@@ -109,6 +120,7 @@ function doPost(e) {
 
   } catch (error) {
     Logger.log(`Error en doPost: ${error.toString()}`);
+    Logger.log(`Error stack: ${error.stack}`);
     return ContentService
       .createTextOutput(JSON.stringify({
         success: false,
