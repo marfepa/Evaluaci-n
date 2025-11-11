@@ -2373,6 +2373,10 @@ function listarReportesExistentes() {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sheets = ss.getSheets();
 
+    // Obtener la fecha de última modificación del archivo usando DriveApp
+    const file = DriveApp.getFileById(SPREADSHEET_ID);
+    const ultimaModificacion = file.getLastUpdated();
+
     const reportes = [];
 
     sheets.forEach(sheet => {
@@ -2414,7 +2418,7 @@ function listarReportesExistentes() {
           nombre: nombre,
           tipo: tipo,
           info: info,
-          ultimaModificacion: ss.getLastUpdated()
+          ultimaModificacion: ultimaModificacion
         });
       }
     });
