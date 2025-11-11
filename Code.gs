@@ -2370,19 +2370,41 @@ function reporteAsistenciaAvanzada_UI() {
  */
 function listarReportesExistentes() {
   try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheets = ss.getSheets();
-
-    // Intentar obtener la fecha de última modificación del archivo usando DriveApp
-    // Si falla (por permisos), usar la fecha actual
-    let ultimaModificacion;
-    try {
-      const file = DriveApp.getFileById(SPREADSHEET_ID);
-      ultimaModificacion = file.getLastUpdated();
-    } catch (dateError) {
-      Logger.log('No se pudo obtener fecha de última modificación, usando fecha actual: ' + dateError);
-      ultimaModificacion = new Date();
+    // Validar que SPREADSHEET_ID esté configurado
+    if (!SPREADSHEET_ID || SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
+      Logger.log('ERROR: SPREADSHEET_ID no está configurado correctamente');
+      return {
+        success: false,
+        message: 'Error de configuración: SPREADSHEET_ID no está definido. Por favor, configura el ID de tu hoja de cálculo en Code.gs'
+      };
     }
+
+    Logger.log('Intentando abrir spreadsheet con ID: ' + SPREADSHEET_ID);
+
+    let ss;
+    try {
+      ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    } catch (ssError) {
+      Logger.log('ERROR al abrir spreadsheet: ' + ssError);
+      // Intentar con el spreadsheet activo como fallback
+      try {
+        ss = SpreadsheetApp.getActiveSpreadsheet();
+        Logger.log('Usando spreadsheet activo como fallback');
+      } catch (activeError) {
+        Logger.log('ERROR al obtener spreadsheet activo: ' + activeError);
+        return {
+          success: false,
+          message: 'No se puede acceder al spreadsheet. Verifica que el ID sea correcto y tengas permisos.'
+        };
+      }
+    }
+
+    Logger.log('Spreadsheet abierto correctamente, obteniendo hojas...');
+    const sheets = ss.getSheets();
+    Logger.log('Total de hojas encontradas: ' + sheets.length);
+
+    // Usar fecha actual para evitar problemas de permisos con DriveApp
+    const ultimaModificacion = new Date();
 
     const reportes = [];
 
@@ -2454,8 +2476,12 @@ function listarReportesExistentes() {
       }
     });
 
-    // Ordenar por fecha de modificación (más reciente primero)
-    reportes.sort((a, b) => b.ultimaModificacion - a.ultimaModificacion);
+    Logger.log('Total de reportes identificados: ' + reportes.length);
+
+    // Ordenar por nombre (alfabéticamente) ya que todos tienen la misma fecha
+    reportes.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    Logger.log('Reportes encontrados: ' + reportes.map(r => r.nombre).join(', '));
 
     return {
       success: true,
@@ -2463,8 +2489,13 @@ function listarReportesExistentes() {
     };
 
   } catch (error) {
-    Logger.log('Error en listarReportesExistentes: ' + error);
-    return { success: false, message: 'Error: ' + error.message };
+    const errorMsg = 'Error en listarReportesExistentes: ' + error.toString() +
+                     ' | Stack: ' + (error.stack || 'No disponible');
+    Logger.log(errorMsg);
+    return {
+      success: false,
+      message: 'Error al obtener reportes: ' + error.message + '. Revisa la consola de Apps Script para más detalles.'
+    };
   }
 }
 
@@ -2528,16 +2559,47 @@ function exportarReportePDF(nombreHoja) {
       return { success: false, message: 'Debe especificar el nombre de la hoja' };
     }
 
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log('Exportando a PDF la hoja: ' + nombreHoja);
+
+    // Validar que SPREADSHEET_ID esté configurado
+    if (!SPREADSHEET_ID || SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
+      Logger.log('ERROR: SPREADSHEET_ID no está configurado');
+      return {
+        success: false,
+        message: 'Error de configuración: SPREADSHEET_ID no está definido'
+      };
+    }
+
+    let ss;
+    try {
+      ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    } catch (ssError) {
+      Logger.log('ERROR al abrir spreadsheet: ' + ssError);
+      // Intentar con el spreadsheet activo como fallback
+      try {
+        ss = SpreadsheetApp.getActiveSpreadsheet();
+        Logger.log('Usando spreadsheet activo');
+      } catch (activeError) {
+        Logger.log('ERROR al obtener spreadsheet activo: ' + activeError);
+        return {
+          success: false,
+          message: 'No se puede acceder al spreadsheet'
+        };
+      }
+    }
+
     const sheet = ss.getSheetByName(nombreHoja);
 
     if (!sheet) {
+      Logger.log('ERROR: No se encontró la hoja "' + nombreHoja + '"');
       return { success: false, message: 'No se encontró la hoja "' + nombreHoja + '"' };
     }
 
     // Construir URL de exportación a PDF
     const sheetId = sheet.getSheetId();
     const url = ss.getUrl().replace(/edit$/, 'export?format=pdf&gid=' + sheetId);
+
+    Logger.log('PDF URL generada correctamente: ' + url);
 
     return {
       success: true,
@@ -2547,8 +2609,101 @@ function exportarReportePDF(nombreHoja) {
     };
 
   } catch (error) {
-    Logger.log('Error en exportarReportePDF: ' + error);
-    return { success: false, message: 'Error: ' + error.message };
+    const errorMsg = 'Error en exportarReportePDF: ' + error.toString() +
+                     ' | Stack: ' + (error.stack || 'No disponible');
+    Logger.log(errorMsg);
+    return {
+      success: false,
+      message: 'Error al exportar a PDF: ' + error.message
+    };
+  }
+}
+
+/**
+ * Función de diagnóstico para verificar configuración y hojas disponibles
+ * Ejecuta esta función manualmente desde el editor de Apps Script para ver
+ * información detallada sobre el spreadsheet y las hojas
+ */
+function diagnosticoReportes() {
+  Logger.log('=== INICIO DIAGNÓSTICO DE REPORTES ===');
+
+  try {
+    // Verificar SPREADSHEET_ID
+    Logger.log('1. Verificando SPREADSHEET_ID...');
+    Logger.log('   SPREADSHEET_ID = ' + SPREADSHEET_ID);
+
+    if (!SPREADSHEET_ID || SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
+      Logger.log('   ⚠️ ERROR: SPREADSHEET_ID no está configurado correctamente');
+      Logger.log('   Por favor, configura el SPREADSHEET_ID en la línea 6 de Code.gs');
+      return;
+    }
+    Logger.log('   ✓ SPREADSHEET_ID está configurado');
+
+    // Abrir spreadsheet
+    Logger.log('2. Intentando abrir spreadsheet...');
+    let ss;
+    try {
+      ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      Logger.log('   ✓ Spreadsheet abierto correctamente usando ID');
+    } catch (error) {
+      Logger.log('   ⚠️ Error al abrir por ID: ' + error);
+      Logger.log('   Intentando usar spreadsheet activo...');
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+      Logger.log('   ✓ Usando spreadsheet activo');
+    }
+
+    // Obtener información del spreadsheet
+    Logger.log('3. Información del spreadsheet:');
+    Logger.log('   Nombre: ' + ss.getName());
+    Logger.log('   URL: ' + ss.getUrl());
+    Logger.log('   ID: ' + ss.getId());
+
+    // Listar todas las hojas
+    Logger.log('4. Listando todas las hojas...');
+    const sheets = ss.getSheets();
+    Logger.log('   Total de hojas: ' + sheets.length);
+
+    Logger.log('5. Detalle de cada hoja:');
+    sheets.forEach((sheet, index) => {
+      const nombre = sheet.getName();
+      Logger.log('   [' + (index + 1) + '] ' + nombre);
+
+      // Identificar tipo de reporte
+      if (nombre.startsWith('RepNotas ')) {
+        Logger.log('       → Tipo: Reporte de Notas ✓');
+      } else if (nombre.startsWith('Reporte_Asistencia')) {
+        Logger.log('       → Tipo: Reporte de Asistencia ✓');
+      } else if (nombre.startsWith('Reporte_Calif')) {
+        Logger.log('       → Tipo: Reporte de Calificaciones ✓');
+      } else if (nombre === 'Comparativa_Calificaciones_Cursos') {
+        Logger.log('       → Tipo: Comparativa ✓');
+      } else {
+        Logger.log('       → No es un reporte (será ignorado)');
+      }
+    });
+
+    // Probar función listarReportesExistentes
+    Logger.log('6. Probando función listarReportesExistentes()...');
+    const resultado = listarReportesExistentes();
+
+    if (resultado.success) {
+      Logger.log('   ✓ Función ejecutada correctamente');
+      Logger.log('   Reportes encontrados: ' + resultado.data.length);
+      resultado.data.forEach((reporte, index) => {
+        Logger.log('   [' + (index + 1) + '] ' + reporte.nombre + ' (Tipo: ' + reporte.tipo + ')');
+      });
+    } else {
+      Logger.log('   ⚠️ ERROR en la función:');
+      Logger.log('   Mensaje: ' + resultado.message);
+    }
+
+    Logger.log('=== FIN DIAGNÓSTICO ===');
+    Logger.log('Revisa los logs arriba para identificar posibles problemas.');
+
+  } catch (error) {
+    Logger.log('⚠️ ERROR CRÍTICO en diagnóstico:');
+    Logger.log('Mensaje: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
   }
 }
 
