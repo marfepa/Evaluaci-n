@@ -2379,29 +2379,53 @@ function listarReportesExistentes() {
       };
     }
 
-    Logger.log('Intentando abrir spreadsheet con ID: ' + SPREADSHEET_ID);
+    Logger.log('=== INICIO listarReportesExistentes ===');
+    Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
 
     let ss;
+    let metodoAcceso = '';
+
     try {
+      Logger.log('Método 1: Intentando SpreadsheetApp.openById...');
       ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      metodoAcceso = 'openById';
+      Logger.log('✓ Éxito con openById');
     } catch (ssError) {
-      Logger.log('ERROR al abrir spreadsheet: ' + ssError);
+      Logger.log('✖ Falló openById: ' + ssError.message);
+      Logger.log('Stack: ' + (ssError.stack || 'N/A'));
+
       // Intentar con el spreadsheet activo como fallback
       try {
+        Logger.log('Método 2: Intentando SpreadsheetApp.getActiveSpreadsheet...');
         ss = SpreadsheetApp.getActiveSpreadsheet();
-        Logger.log('Usando spreadsheet activo como fallback');
+        metodoAcceso = 'getActiveSpreadsheet';
+        Logger.log('✓ Éxito con getActiveSpreadsheet');
       } catch (activeError) {
-        Logger.log('ERROR al obtener spreadsheet activo: ' + activeError);
+        Logger.log('✖ Falló getActiveSpreadsheet: ' + activeError.message);
+        Logger.log('Stack: ' + (activeError.stack || 'N/A'));
+
         return {
           success: false,
-          message: 'No se puede acceder al spreadsheet. Verifica que el ID sea correcto y tengas permisos.'
+          message: 'No se puede acceder al spreadsheet. Error original: ' + ssError.message + '. Error fallback: ' + activeError.message
         };
       }
     }
 
-    Logger.log('Spreadsheet abierto correctamente, obteniendo hojas...');
-    const sheets = ss.getSheets();
-    Logger.log('Total de hojas encontradas: ' + sheets.length);
+    Logger.log('Spreadsheet abierto con método: ' + metodoAcceso);
+    Logger.log('Spreadsheet ID real: ' + ss.getId());
+    Logger.log('Spreadsheet nombre: ' + ss.getName());
+
+    let sheets;
+    try {
+      sheets = ss.getSheets();
+      Logger.log('✓ Total de hojas obtenidas: ' + sheets.length);
+    } catch (sheetError) {
+      Logger.log('✖ Error al obtener hojas: ' + sheetError.message);
+      return {
+        success: false,
+        message: 'Error al obtener hojas del spreadsheet: ' + sheetError.message
+      };
+    }
 
     // Usar fecha actual para evitar problemas de permisos con DriveApp
     const ultimaModificacion = new Date();
@@ -2411,65 +2435,143 @@ function listarReportesExistentes() {
     sheets.forEach(sheet => {
       const nombre = sheet.getName();
       let tipo = null;
+      let subtipo = null;
       let info = {};
 
-      // Identificar reportes de notas (formato: "RepNotas CURSO-SITUACION")
+      Logger.log('Analizando hoja: "' + nombre + '"');
+
+      // ========================================
+      // 📊 REPORTES DE NOTAS
+      // ========================================
+
+      // 1. Reportes de notas por situación (formato: "RepNotas CURSO-SITUACION")
       if (nombre.startsWith('RepNotas ')) {
+        Logger.log('  ✓ Coincide con patrón RepNotas');
         tipo = 'notas';
+        subtipo = 'situacion';
         const resto = nombre.substring(9); // Quitar "RepNotas "
         const dashIndex = resto.indexOf('-');
         if (dashIndex > 0) {
           info = {
             curso: resto.substring(0, dashIndex).trim(),
-            situacion: resto.substring(dashIndex + 1).trim()
+            situacion: resto.substring(dashIndex + 1).trim(),
+            descripcion: `Notas: ${resto.substring(0, dashIndex).trim()} - ${resto.substring(dashIndex + 1).trim()}`
           };
         } else {
-          info = { descripcion: resto.trim() };
+          info = {
+            descripcion: resto.trim() || 'Reporte de notas'
+          };
         }
       }
-      // Identificar reportes avanzados de asistencia
+
+      // 2. Reportes de calificaciones por estudiante
+      else if (nombre === 'Reporte_Calif_Estudiante') {
+        tipo = 'notas';
+        subtipo = 'estudiante';
+        info = { descripcion: 'Calificaciones por estudiante' };
+      }
+
+      // 3. Reportes de calificaciones por curso
+      else if (nombre === 'Reporte_Calif_Curso') {
+        tipo = 'notas';
+        subtipo = 'curso';
+        info = { descripcion: 'Calificaciones por curso' };
+      }
+
+      // 4. Reportes generales de calificaciones
+      else if (nombre === 'Reporte_Calificaciones') {
+        tipo = 'notas';
+        subtipo = 'general';
+        info = { descripcion: 'Reporte general de calificaciones' };
+      }
+
+      // ========================================
+      // 📋 REPORTES DE ASISTENCIA
+      // ========================================
+
+      // 1. Reportes avanzados de asistencia
       else if (nombre === 'Reporte_Asistencia_Av') {
-        tipo = 'asistencia_avanzada';
+        tipo = 'asistencia';
+        subtipo = 'avanzado';
         info = { descripcion: 'Reporte avanzado de asistencia por curso' };
       }
       else if (nombre === 'Reporte_Asistencia_Av_Diario') {
-        tipo = 'asistencia_avanzada';
+        tipo = 'asistencia';
+        subtipo = 'avanzado_diario';
         info = { descripcion: 'Reporte consolidado diario de asistencia' };
       }
       else if (nombre === 'Reporte_Avanzado_Asistencia') {
-        tipo = 'asistencia_avanzada';
+        tipo = 'asistencia';
+        subtipo = 'avanzado_completo';
         info = { descripcion: 'Reporte completo de asistencia con estadísticas' };
       }
-      // Identificar reportes de asistencia con fecha
-      else if (nombre.startsWith('Reporte_Asistencia_')) {
+
+      // 2. Reportes de asistencia con fecha o sufijo
+      else if (nombre.startsWith('Reporte_Asistencia_') && nombre !== 'Reporte_Asistencia_Av' && nombre !== 'Reporte_Asistencia_Av_Diario') {
         tipo = 'asistencia';
-        const fecha = nombre.substring(19); // Quitar "Reporte_Asistencia_"
-        info = { fecha: fecha };
+        subtipo = 'fecha';
+        const sufijo = nombre.substring(19); // Quitar "Reporte_Asistencia_"
+        info = {
+          fecha: sufijo,
+          descripcion: `Asistencia - ${sufijo}`
+        };
       }
-      // Identificar reporte de asistencia simple
+
+      // 3. Reporte de asistencia simple
       else if (nombre === 'Reporte_Asistencia') {
         tipo = 'asistencia';
+        subtipo = 'simple';
         info = { descripcion: 'Reporte de asistencia' };
       }
-      // Identificar reportes de calificaciones
-      else if (nombre === 'Reporte_Calif_Estudiante') {
-        tipo = 'notas';
-        info = { descripcion: 'Reporte de calificaciones por estudiante' };
-      }
-      else if (nombre === 'Reporte_Calif_Curso') {
-        tipo = 'notas';
-        info = { descripcion: 'Reporte de calificaciones por curso' };
-      }
-      // Identificar comparativas de calificaciones
-      else if (nombre === 'Comparativa_Calificaciones_Cursos') {
+
+      // ========================================
+      // 🔄 COMPARATIVAS
+      // ========================================
+
+      // 1. Comparativas de estudiantes
+      else if (nombre === 'Comparativa_Estudiantes') {
         tipo = 'comparativa';
+        subtipo = 'estudiantes';
+        info = { descripcion: 'Comparativa entre estudiantes' };
+      }
+
+      // 2. Comparativas de cursos
+      else if (nombre === 'Comparativa_Cursos') {
+        tipo = 'comparativa';
+        subtipo = 'cursos';
         info = { descripcion: 'Comparativa entre cursos' };
       }
 
+      // 3. Comparativas de calificaciones por estudiantes
+      else if (nombre === 'Comparativa_Calificaciones_Estudiantes' || nombre === 'Comparativa_Calif_Est') {
+        tipo = 'comparativa';
+        subtipo = 'calificaciones_estudiantes';
+        info = { descripcion: 'Comparativa de calificaciones entre estudiantes' };
+      }
+
+      // 4. Comparativas de calificaciones por cursos
+      else if (nombre === 'Comparativa_Calificaciones_Cursos' || nombre === 'Comparativa_Calif_Cursos') {
+        tipo = 'comparativa';
+        subtipo = 'calificaciones_cursos';
+        info = { descripcion: 'Comparativa de calificaciones entre cursos' };
+      }
+
+      // ========================================
+      // 🔧 DIAGNÓSTICO
+      // ========================================
+
+      else if (nombre === 'Diagnostico_Sistema') {
+        tipo = 'diagnostico';
+        subtipo = 'sistema';
+        info = { descripcion: 'Diagnóstico del sistema' };
+      }
+
+      // Si se identificó un tipo de reporte, agregarlo a la lista
       if (tipo) {
         reportes.push({
           nombre: nombre,
           tipo: tipo,
+          subtipo: subtipo || 'general',
           info: info,
           ultimaModificacion: ultimaModificacion
         });
@@ -2479,9 +2581,26 @@ function listarReportesExistentes() {
     Logger.log('Total de reportes identificados: ' + reportes.length);
 
     // Ordenar por nombre (alfabéticamente) ya que todos tienen la misma fecha
-    reportes.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    try {
+      reportes.sort((a, b) => {
+        const nombreA = a.nombre || '';
+        const nombreB = b.nombre || '';
+        return nombreA.localeCompare(nombreB);
+      });
+      Logger.log('✓ Reportes ordenados correctamente');
+    } catch (sortError) {
+      Logger.log('⚠️ Error al ordenar reportes: ' + sortError.message);
+    }
 
-    Logger.log('Reportes encontrados: ' + reportes.map(r => r.nombre).join(', '));
+    // Intentar loggear los nombres de reportes de forma segura
+    try {
+      const nombres = reportes.map(r => r.nombre || '(sin nombre)').join(', ');
+      Logger.log('Reportes encontrados: ' + nombres);
+    } catch (logError) {
+      Logger.log('⚠️ No se pudo loggear nombres de reportes: ' + logError.message);
+    }
+
+    Logger.log('=== FIN listarReportesExistentes - Retornando éxito con ' + reportes.length + ' reportes ===');
 
     return {
       success: true,
