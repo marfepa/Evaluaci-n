@@ -1158,18 +1158,51 @@ function recordRubricaPeerGrade(formData) {
 function reporteNotasSituacion() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // Verificar que la hoja existe
+  const sheet = ss.getSheetByName('CalificacionesDetalladas');
+  if (!sheet) {
+    ui.alert('⚠️ Error', 'La hoja "CalificacionesDetalladas" no existe.', ui.ButtonSet.OK);
+    return;
+  }
+
   const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
+
+  // Verificar que hay datos
+  if (!values || values.length === 0) {
+    ui.alert('⚠️ Sin datos', 'La hoja "CalificacionesDetalladas" está vacía.', ui.ButtonSet.OK);
+    return;
+  }
+
   const idxC = headers.indexOf('CursoEvaluado');
   const idxS = headers.indexOf('NombreSituacion');
+
+  // Verificar que las columnas existen
+  if (idxC === -1 || idxS === -1) {
+    ui.alert('⚠️ Error',
+      'No se encontraron las columnas necesarias:\n' +
+      (idxC === -1 ? '- CursoEvaluado\n' : '') +
+      (idxS === -1 ? '- NombreSituacion\n' : ''),
+      ui.ButtonSet.OK);
+    return;
+  }
 
   const mapping = {};
   values.forEach(r => {
     const curso = r[idxC], sit = r[idxS];
-    if (!mapping[curso]) mapping[curso] = [];
-    if (mapping[curso].indexOf(sit) < 0) mapping[curso].push(sit);
+    if (curso && sit) {  // Solo agregar si ambos valores existen
+      if (!mapping[curso]) mapping[curso] = [];
+      if (mapping[curso].indexOf(sit) < 0) mapping[curso].push(sit);
+    }
   });
   Object.values(mapping).forEach(arr => arr.sort());
   const cursos = Object.keys(mapping).sort();
+
+  // Verificar que hay cursos disponibles
+  if (cursos.length === 0) {
+    ui.alert('⚠️ Sin datos', 'No hay cursos con situaciones disponibles en "CalificacionesDetalladas".', ui.ButtonSet.OK);
+    return;
+  }
 
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
@@ -1187,9 +1220,26 @@ function reporteNotasSituacion() {
           cursoSel.addEventListener('change', updateSituaciones);
           updateSituaciones();
           document.getElementById('generar').addEventListener('click', () => {
+            const btn = document.getElementById('generar');
+            btn.disabled = true;
+            btn.textContent = 'Generando...';
+
             google.script.run
-              .withSuccessHandler(() => google.script.host.close())
-              .withFailureHandler(err => alert('ERROR: ' + err.message))
+              .withSuccessHandler((result) => {
+                if (result && result.success) {
+                  alert('✅ ' + result.message);
+                  google.script.host.close();
+                } else {
+                  alert('⚠️ ' + (result ? result.message : 'Error desconocido'));
+                  btn.disabled = false;
+                  btn.textContent = 'Generar';
+                }
+              })
+              .withFailureHandler(err => {
+                alert('❌ ERROR: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = 'Generar';
+              })
               .generateReporteNotasSituacion(cursoSel.value, sitSel.value);
           });
         });
@@ -1211,42 +1261,78 @@ function reporteNotasSituacion() {
 }
 
 function generateReporteNotasSituacion(curso, situacion) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
-  const iE = headers.indexOf('NombreEstudiante');
-  const iI = headers.indexOf('NombreInstrumento');
-  const iF = headers.indexOf('FechaEvaluacion');
-  const iT = headers.indexOf('CalificacionTotalInstrumento');
-  const iC = headers.indexOf('CursoEvaluado');
-  const iS = headers.indexOf('NombreSituacion');
+  try {
+    // Validar parámetros
+    if (!curso || !situacion) {
+      return { success: false, message: 'Por favor seleccione curso y situación.' };
+    }
 
-  const datos = values.filter(r => r[iC] === curso && r[iS] === situacion);
-  if (!datos.length) { SpreadsheetApp.getUi().alert(`No hay datos para "${curso}" / "${situacion}".`); return; }
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
 
-  const agrup = {};
-  datos.forEach(r => {
-    const est   = r[iE];
-    const inst  = r[iI];
-    const fecha = Utilities.formatDate(new Date(r[iF]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    const key   = `${est}│${inst}│${fecha}`;
-    const cal   = parseFloat(r[iT]) || 0;
-    if (!agrup[key]) agrup[key] = { est, inst, fecha, sum: 0, cnt: 0 };
-    agrup[key].sum += cal; agrup[key].cnt++;
-  });
-  const filas = Object.values(agrup).map(o => [o.est, o.inst, o.fecha, (o.sum / o.cnt).toFixed(2)]);
+    // Verificar columnas necesarias
+    const iE = headers.indexOf('NombreEstudiante');
+    const iI = headers.indexOf('NombreInstrumento');
+    const iF = headers.indexOf('FechaEvaluacion');
+    const iT = headers.indexOf('CalificacionTotalInstrumento');
+    const iC = headers.indexOf('CursoEvaluado');
+    const iS = headers.indexOf('NombreSituacion');
 
-  const nombreHoja = `RepNotas ${curso}-${situacion}`.substring(0, 99);
-  const vieja = ss.getSheetByName(nombreHoja);
-  if (vieja) ss.deleteSheet(vieja);
-  const hoja = ss.insertSheet(nombreHoja, ss.getSheets().length);
+    if (iE === -1 || iI === -1 || iF === -1 || iT === -1 || iC === -1 || iS === -1) {
+      return {
+        success: false,
+        message: 'Faltan columnas requeridas en "CalificacionesDetalladas".'
+      };
+    }
 
-  // Preparar todas las filas para escritura batch
-  const allRows = [['Estudiante','Instrumento','Fecha','Calificación'], ...filas];
+    // Filtrar datos
+    const datos = values.filter(r => r[iC] === curso && r[iS] === situacion);
+    if (!datos.length) {
+      return {
+        success: false,
+        message: `No hay datos para "${curso}" / "${situacion}".`
+      };
+    }
 
-  // Escribir todo de una vez
-  hoja.getRange(1, 1, allRows.length, 4).setValues(allRows);
-  hoja.autoResizeColumns(1, 4);
-  ss.setActiveSheet(hoja);
+    // Agrupar datos
+    const agrup = {};
+    datos.forEach(r => {
+      const est   = r[iE];
+      const inst  = r[iI];
+      const fecha = Utilities.formatDate(new Date(r[iF]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      const key   = `${est}│${inst}│${fecha}`;
+      const cal   = parseFloat(r[iT]) || 0;
+      if (!agrup[key]) agrup[key] = { est, inst, fecha, sum: 0, cnt: 0 };
+      agrup[key].sum += cal; agrup[key].cnt++;
+    });
+    const filas = Object.values(agrup).map(o => [o.est, o.inst, o.fecha, (o.sum / o.cnt).toFixed(2)]);
+
+    // Crear o reemplazar hoja
+    const nombreHoja = `RepNotas ${curso}-${situacion}`.substring(0, 99);
+    const vieja = ss.getSheetByName(nombreHoja);
+    if (vieja) ss.deleteSheet(vieja);
+    const hoja = ss.insertSheet(nombreHoja, ss.getSheets().length);
+
+    // Preparar todas las filas para escritura batch
+    const allRows = [['Estudiante','Instrumento','Fecha','Calificación'], ...filas];
+
+    // Escribir todo de una vez
+    hoja.getRange(1, 1, allRows.length, 4).setValues(allRows);
+    hoja.autoResizeColumns(1, 4);
+    ss.setActiveSheet(hoja);
+
+    return {
+      success: true,
+      message: `Reporte generado con ${filas.length} registro(s) en la hoja "${nombreHoja}".`
+    };
+
+  } catch (error) {
+    Logger.log('Error en generateReporteNotasSituacion: ' + error.toString());
+    return {
+      success: false,
+      message: 'Error al generar el reporte: ' + error.message
+    };
+  }
 }
 
 function calculaMediaPonderadaDesdeHoja() {
