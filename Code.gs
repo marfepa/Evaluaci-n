@@ -1166,7 +1166,8 @@ function reporteNotasSituacion() {
     return;
   }
 
-  const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
+  // ✅ Usar lectura directa para evitar problemas con caché y stack overflow
+  const { headers, values } = getSheetDataDirect(ss, 'CalificacionesDetalladas');
 
   // Verificar que hay datos
   if (!values || values.length === 0) {
@@ -1187,15 +1188,31 @@ function reporteNotasSituacion() {
     return;
   }
 
+  // ✅ Optimización: usar Set para evitar duplicados sin indexOf (más eficiente)
   const mapping = {};
-  values.forEach(r => {
+  const tempSets = {}; // Usar Sets temporales para búsqueda O(1)
+
+  // Procesar datos de forma más eficiente
+  for (let i = 0; i < values.length; i++) {
+    const r = values[i];
     const curso = r[idxC], sit = r[idxS];
-    if (curso && sit) {  // Solo agregar si ambos valores existen
-      if (!mapping[curso]) mapping[curso] = [];
-      if (mapping[curso].indexOf(sit) < 0) mapping[curso].push(sit);
+    if (curso && sit) {
+      if (!tempSets[curso]) {
+        tempSets[curso] = new Set();
+        mapping[curso] = [];
+      }
+      if (!tempSets[curso].has(sit)) {
+        tempSets[curso].add(sit);
+        mapping[curso].push(sit);
+      }
     }
+  }
+
+  // Ordenar situaciones dentro de cada curso
+  Object.keys(mapping).forEach(curso => {
+    mapping[curso].sort();
   });
-  Object.values(mapping).forEach(arr => arr.sort());
+
   const cursos = Object.keys(mapping).sort();
 
   // Verificar que hay cursos disponibles
@@ -1268,7 +1285,9 @@ function generateReporteNotasSituacion(curso, situacion) {
     }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
+
+    // ✅ Usar lectura directa para evitar problemas con caché y stack overflow
+    const { headers, values } = getSheetDataDirect(ss, 'CalificacionesDetalladas');
 
     // Verificar columnas necesarias
     const iE = headers.indexOf('NombreEstudiante');
@@ -1285,27 +1304,42 @@ function generateReporteNotasSituacion(curso, situacion) {
       };
     }
 
-    // Filtrar datos
-    const datos = values.filter(r => r[iC] === curso && r[iS] === situacion);
-    if (!datos.length) {
+    // ✅ Filtrar y agrupar datos de forma eficiente usando for loop
+    const agrup = {};
+    let datosEncontrados = 0;
+
+    for (let i = 0; i < values.length; i++) {
+      const r = values[i];
+      // Filtrar por curso y situación
+      if (r[iC] === curso && r[iS] === situacion) {
+        datosEncontrados++;
+        const est   = r[iE];
+        const inst  = r[iI];
+        const fecha = Utilities.formatDate(new Date(r[iF]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        const key   = `${est}│${inst}│${fecha}`;
+        const cal   = parseFloat(r[iT]) || 0;
+
+        if (!agrup[key]) {
+          agrup[key] = { est, inst, fecha, sum: 0, cnt: 0 };
+        }
+        agrup[key].sum += cal;
+        agrup[key].cnt++;
+      }
+    }
+
+    if (datosEncontrados === 0) {
       return {
         success: false,
         message: `No hay datos para "${curso}" / "${situacion}".`
       };
     }
 
-    // Agrupar datos
-    const agrup = {};
-    datos.forEach(r => {
-      const est   = r[iE];
-      const inst  = r[iI];
-      const fecha = Utilities.formatDate(new Date(r[iF]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      const key   = `${est}│${inst}│${fecha}`;
-      const cal   = parseFloat(r[iT]) || 0;
-      if (!agrup[key]) agrup[key] = { est, inst, fecha, sum: 0, cnt: 0 };
-      agrup[key].sum += cal; agrup[key].cnt++;
-    });
-    const filas = Object.values(agrup).map(o => [o.est, o.inst, o.fecha, (o.sum / o.cnt).toFixed(2)]);
+    // Convertir agrupaciones a filas
+    const filas = [];
+    for (const key in agrup) {
+      const o = agrup[key];
+      filas.push([o.est, o.inst, o.fecha, (o.sum / o.cnt).toFixed(2)]);
+    }
 
     // Crear o reemplazar hoja
     const nombreHoja = `RepNotas ${curso}-${situacion}`.substring(0, 99);
