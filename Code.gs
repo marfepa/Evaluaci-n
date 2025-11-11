@@ -583,6 +583,12 @@ function getSheetDataDirect(ss, sheetName) {
 function getSheetData(ss, sheetName) {
   if (!ss) ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
+  // ✅ Prevenir uso de caché si ya estamos en una operación de carga de caché
+  // Esto evita recursión circular cuando getCachedData llama a loadFunction
+  if (typeof _cacheCallStack !== 'undefined' && _cacheCallStack.has('sheet_' + sheetName)) {
+    return getSheetDataDirect(ss, sheetName);
+  }
+
   // ✅ Usar sistema de caché optimizado si está disponible
   if (typeof getSheetDataCached === 'function') {
     return getSheetDataCached(ss, sheetName);
@@ -2747,28 +2753,53 @@ function getInstrumentosData() {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const instrumentos = getInstrumentosCached(ss);
 
-    // Añadir el nombre de la situación a cada instrumento
+    // Obtener datos de situaciones de aprendizaje UNA SOLA VEZ
+    let situacionesData = null;
+    try {
+      situacionesData = getSheetData(ss, 'SituacionesAprendizaje');
+    } catch (e) {
+      Logger.log('Error al obtener situaciones: ' + e.message);
+    }
+
+    // Añadir el nombre de la situación y el curso a cada instrumento
     return instrumentos.map(inst => {
       const situacionKey = Object.keys(inst).find(k => k.toLowerCase().includes('situac'));
       const situacionId = situacionKey ? inst[situacionKey] : '';
 
-      // Intentar obtener el nombre de la situación
+      // Inicializar valores por defecto
       let nombreSituacion = situacionId;
-      try {
-        const { headers, values } = getSheetData(ss, 'SituacionesAprendizaje');
-        const idxId = headers.indexOf('IDSituacionAprendizaje');
-        const idxNombre = headers.indexOf('NombreSituacion');
-        const fila = values.find(r => r[idxId] === situacionId);
-        if (fila && idxNombre >= 0) {
-          nombreSituacion = fila[idxNombre] || situacionId;
+      let cursoId = '';
+
+      // Intentar obtener el nombre de la situación Y el curso asociado
+      if (situacionesData && situacionId) {
+        try {
+          const { headers, values } = situacionesData;
+          const idxId = headers.indexOf('IDSituacionAprendizaje');
+          const idxNombre = headers.indexOf('NombreSituacion');
+          const idxCurso = headers.indexOf('CursoID');
+
+          const fila = values.find(r => r[idxId] === situacionId);
+
+          if (fila) {
+            // Obtener nombre de situación
+            if (idxNombre >= 0) {
+              nombreSituacion = fila[idxNombre] || situacionId;
+            }
+
+            // Obtener curso asociado
+            if (idxCurso >= 0) {
+              cursoId = fila[idxCurso] || '';
+            }
+          }
+        } catch (e) {
+          Logger.log('Error al procesar situación ' + situacionId + ': ' + e.message);
         }
-      } catch (e) {
-        // Si no se puede obtener, usar el ID
       }
 
       return {
         ...inst,
-        Situacion: nombreSituacion
+        Situacion: nombreSituacion,
+        Curso: cursoId
       };
     });
   } catch (error) {

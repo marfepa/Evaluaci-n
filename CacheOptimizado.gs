@@ -41,6 +41,9 @@ const CACHE_CONFIG = {
   DEBUG_CACHE: false
 };
 
+// Prevenir recursión infinita en llamadas de caché
+const _cacheCallStack = new Set();
+
 // ===== CACHÉ EN MEMORIA (ultra rápido) =====
 class MemoryCache {
   constructor() {
@@ -275,34 +278,48 @@ const persistCache = new PersistentCache();
  * @returns {any} - Datos cacheados o recién cargados
  */
 function getCachedData(key, loadFunction, ttl = 600) {
-  // Nivel 1: Memoria (ultra rápido)
-  let data = memCache.get(key, ttl);
-  if (data !== null) {
-    return data;
+  // Protección contra recursión infinita
+  if (_cacheCallStack.has(key)) {
+    Logger.log(`⚠️ Recursion detected for cache key: ${key}. Calling loadFunction directly.`);
+    return loadFunction();
   }
 
-  // Nivel 2: CacheService (rápido)
-  data = persistCache.get(key);
-  if (data !== null) {
-    // Guardar en memoria para próxima vez
+  try {
+    // Registrar que estamos procesando esta clave
+    _cacheCallStack.add(key);
+
+    // Nivel 1: Memoria (ultra rápido)
+    let data = memCache.get(key, ttl);
+    if (data !== null) {
+      return data;
+    }
+
+    // Nivel 2: CacheService (rápido)
+    data = persistCache.get(key);
+    if (data !== null) {
+      // Guardar en memoria para próxima vez
+      memCache.set(key, data);
+      return data;
+    }
+
+    // Nivel 3: Cargar desde fuente (lento)
+    const startTime = Date.now();
+    data = loadFunction();
+    const loadTime = Date.now() - startTime;
+
+    if (CACHE_CONFIG.DEBUG_CACHE) {
+      Logger.log(`⏱️ Loaded from source: ${key} (${loadTime}ms)`);
+    }
+
+    // Guardar en ambos niveles de caché
     memCache.set(key, data);
+    persistCache.set(key, data, ttl);
+
     return data;
+  } finally {
+    // Siempre limpiar el stack cuando terminamos
+    _cacheCallStack.delete(key);
   }
-
-  // Nivel 3: Cargar desde fuente (lento)
-  const startTime = Date.now();
-  data = loadFunction();
-  const loadTime = Date.now() - startTime;
-
-  if (CACHE_CONFIG.DEBUG_CACHE) {
-    Logger.log(`⏱️ Loaded from source: ${key} (${loadTime}ms)`);
-  }
-
-  // Guardar en ambos niveles de caché
-  memCache.set(key, data);
-  persistCache.set(key, data, ttl);
-
-  return data;
 }
 
 /**
@@ -383,7 +400,7 @@ function getCursosCached() {
     'cursos_list',
     () => {
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const estudiantes = getEstudiantes(ss);
+      const estudiantes = getEstudiantesCached(ss);
       const cursosSet = new Set();
       estudiantes.forEach(est => {
         const curso = est.CursoID || est.Curso || est.CursoEvaluado;

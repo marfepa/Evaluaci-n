@@ -1066,6 +1066,39 @@
           </div>
         </div>
 
+        <!-- Filtros -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Filtrar por curso</label>
+            <select class="form-select" id="instrumentCourseFilter" onchange="onCourseFilterChange()">
+              <option value="">Todos los cursos</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Filtrar por situación</label>
+            <select class="form-select" id="instrumentSituationFilter" onchange="loadInstruments()">
+              <option value="">Todas las situaciones</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Filtrar por tipo</label>
+            <select class="form-select" id="instrumentTypeFilter" onchange="loadInstruments()">
+              <option value="">Todos los tipos</option>
+              <option value="Rúbrica">Rúbrica</option>
+              <option value="Lista de Cotejo">Lista de Cotejo</option>
+              <option value="Calificación Directa">Calificación Directa</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Información de filtrado -->
+        <div id="instrumentsFilterInfo" style="display: none; padding: 0.75rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; color: var(--primary);">
+          <strong>📌 Filtros activos:</strong> <span id="instrumentsFilterText"></span>
+          <button onclick="clearInstrumentFilters()" style="background: none; border: none; color: var(--primary); cursor: pointer; text-decoration: underline; margin-left: 0.5rem;">Limpiar filtros</button>
+        </div>
+
         <div class="table-container">
           <table>
             <thead>
@@ -1073,13 +1106,14 @@
                 <th>ID</th>
                 <th>Nombre</th>
                 <th>Tipo</th>
+                <th>Curso</th>
                 <th>Situación</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="instrumentsTable">
               <tr>
-                <td colspan="5">
+                <td colspan="6">
                   <div class="empty-state">
                     <div class="empty-state-icon">🎯</div>
                     <div>Cargando instrumentos...</div>
@@ -1590,24 +1624,72 @@
       }
     }
 
-    // Load instruments
-    async function loadInstruments() {
+    // Cache for instruments data (to avoid refetching on filter changes)
+    let cachedInstruments = null;
+
+    // Load instruments with filtering support
+    async function loadInstruments(skipFetch = false) {
       const tbody = document.getElementById('instrumentsTable');
-      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="loading"></div><div>Cargando...</div></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="loading"></div><div>Cargando...</div></div></td></tr>';
 
       try {
-        const instruments = await callBackend('getInstrumentosData');
+        // Use cached data if available and skipFetch is true
+        let instruments;
+        if (skipFetch && cachedInstruments) {
+          instruments = cachedInstruments;
+          console.log('📦 Usando instrumentos en caché');
+        } else {
+          instruments = await callBackend('getInstrumentosData');
+          cachedInstruments = instruments; // Cache for future use
+          console.log('📊 Instrumentos cargados:', instruments);
+          console.log('🔍 Primer instrumento (ejemplo):', instruments[0]);
+        }
 
         if (!instruments || instruments.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">🎯</div><div>No hay instrumentos registrados</div></div></td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">🎯</div><div>No hay instrumentos registrados</div></div></td></tr>';
           return;
         }
 
-        tbody.innerHTML = instruments.map(inst => `
+        // Populate filter dropdowns with unique values (only if not skipping fetch)
+        if (!skipFetch) {
+          await populateInstrumentFilters(instruments);
+        }
+
+        // Apply filters
+        const courseFilter = document.getElementById('instrumentCourseFilter').value;
+        const situationFilter = document.getElementById('instrumentSituationFilter').value;
+        const typeFilter = document.getElementById('instrumentTypeFilter').value;
+
+        console.log('🔍 Filtros activos:', { courseFilter, situationFilter, typeFilter });
+
+        let filtered = instruments;
+
+        if (courseFilter) {
+          filtered = filtered.filter(inst => inst.Curso === courseFilter);
+        }
+
+        if (situationFilter) {
+          filtered = filtered.filter(inst => inst.Situacion === situationFilter);
+        }
+
+        if (typeFilter) {
+          filtered = filtered.filter(inst => inst.TipoInstrumento === typeFilter);
+        }
+
+        // Show filter info
+        updateInstrumentFilterInfo(courseFilter, situationFilter, typeFilter, filtered.length, instruments.length);
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">🔍</div><div>No se encontraron instrumentos con los filtros seleccionados</div></div></td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(inst => `
           <tr>
             <td>${inst.IDInstrumento || '-'}</td>
             <td>${inst.NombreInstrumento || '-'}</td>
             <td><span class="badge badge-warning">${inst.TipoInstrumento || '-'}</span></td>
+            <td><span class="badge badge-primary">${inst.Curso || '-'}</span></td>
             <td>${inst.Situacion || '-'}</td>
             <td>
               <button class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;"
@@ -1619,8 +1701,123 @@
         `).join('');
       } catch (err) {
         console.error('Error loading instruments:', err);
-        tbody.innerHTML = '<tr><td colspan="5"><div class="alert alert-error">Error al cargar instrumentos</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6"><div class="alert alert-error">Error al cargar instrumentos</div></td></tr>';
       }
+    }
+
+    // Handle course filter change - updates situation dropdown dynamically
+    async function onCourseFilterChange() {
+      const courseFilter = document.getElementById('instrumentCourseFilter').value;
+
+      // Ensure we have cached instruments data
+      if (!cachedInstruments) {
+        await loadInstruments();
+        return;
+      }
+
+      console.log('🔄 Curso seleccionado:', courseFilter);
+
+      // Filter situations based on selected course
+      let situationsToShow = cachedInstruments;
+
+      if (courseFilter) {
+        situationsToShow = cachedInstruments.filter(inst => inst.Curso === courseFilter);
+        console.log(`📋 Situaciones del curso ${courseFilter}:`, situationsToShow.map(i => i.Situacion));
+      } else {
+        console.log('📋 Mostrando todas las situaciones');
+      }
+
+      // Extract unique situations from filtered instruments
+      const situationsSet = new Set();
+      situationsToShow.forEach(inst => {
+        if (inst.Situacion) situationsSet.add(inst.Situacion);
+      });
+
+      // Update situation dropdown
+      const situationSelect = document.getElementById('instrumentSituationFilter');
+      const currentSituation = situationSelect.value;
+
+      situationSelect.innerHTML = '<option value="">Todas las situaciones</option>' +
+        Array.from(situationsSet).sort().map(s => `<option value="${s}">${s}</option>`).join('');
+
+      // Try to preserve selection if it's still valid
+      const validSituations = Array.from(situationsSet);
+      if (validSituations.includes(currentSituation)) {
+        situationSelect.value = currentSituation;
+      } else {
+        situationSelect.value = ''; // Reset if current selection is no longer valid
+      }
+
+      // Reload the table with updated filters
+      loadInstruments(true); // true = skip fetch, use cache
+    }
+
+    // Populate instrument filter dropdowns
+    async function populateInstrumentFilters(instruments) {
+      // Extract unique courses from instruments (via their situations)
+      const coursesSet = new Set();
+      const situationsSet = new Set();
+
+      instruments.forEach(inst => {
+        if (inst.Curso) coursesSet.add(inst.Curso);
+        if (inst.Situacion) situationsSet.add(inst.Situacion);
+      });
+
+      console.log('📚 Cursos encontrados:', Array.from(coursesSet));
+      console.log('📋 Situaciones encontradas:', Array.from(situationsSet));
+
+      // Populate course filter
+      const courseSelect = document.getElementById('instrumentCourseFilter');
+      const currentCourse = courseSelect.value;
+      courseSelect.innerHTML = '<option value="">Todos los cursos</option>' +
+        Array.from(coursesSet).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+      courseSelect.value = currentCourse;
+
+      // Populate situation filter
+      const situationSelect = document.getElementById('instrumentSituationFilter');
+      const currentSituation = situationSelect.value;
+      situationSelect.innerHTML = '<option value="">Todas las situaciones</option>' +
+        Array.from(situationsSet).sort().map(s => `<option value="${s}">${s}</option>`).join('');
+      situationSelect.value = currentSituation;
+    }
+
+    // Update filter info display
+    function updateInstrumentFilterInfo(course, situation, type, filteredCount, totalCount) {
+      const filterInfo = document.getElementById('instrumentsFilterInfo');
+      const filterText = document.getElementById('instrumentsFilterText');
+
+      const activeFilters = [];
+      if (course) activeFilters.push(`Curso: ${course}`);
+      if (situation) activeFilters.push(`Situación: ${situation}`);
+      if (type) activeFilters.push(`Tipo: ${type}`);
+
+      if (activeFilters.length > 0) {
+        filterInfo.style.display = 'block';
+        filterText.textContent = `${activeFilters.join(' • ')} (${filteredCount} de ${totalCount} instrumentos)`;
+      } else {
+        filterInfo.style.display = 'none';
+      }
+    }
+
+    // Clear all instrument filters
+    function clearInstrumentFilters() {
+      document.getElementById('instrumentCourseFilter').value = '';
+      document.getElementById('instrumentSituationFilter').value = '';
+      document.getElementById('instrumentTypeFilter').value = '';
+
+      // Reset situation dropdown to show all situations
+      if (cachedInstruments) {
+        const situationsSet = new Set();
+        cachedInstruments.forEach(inst => {
+          if (inst.Situacion) situationsSet.add(inst.Situacion);
+        });
+
+        const situationSelect = document.getElementById('instrumentSituationFilter');
+        situationSelect.innerHTML = '<option value="">Todas las situaciones</option>' +
+          Array.from(situationsSet).sort().map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+
+      loadInstruments(true); // Use cache
     }
 
     // ============================================================================
