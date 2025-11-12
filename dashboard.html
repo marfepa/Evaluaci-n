@@ -2851,32 +2851,66 @@
           console.log('📊 response.result?.data:', response.result?.data);
         }
 
-        // Intentar extraer datos con múltiples estrategias
+        // Extraer datos de la respuesta con manejo robusto
         let actualData = null;
+        let arrayReportes = null;
 
+        // Estrategia 1: Web App mode - response.result contiene el resultado
         if (response && response.success && response.result) {
-          console.log('✅ Estrategia 1: Unwrap desde response.result');
+          console.log('✅ Estrategia 1: Web App mode (response.result)');
           actualData = response.result;
-        } else if (response && response.data) {
-          console.log('✅ Estrategia 2: Datos directos en response.data');
+        }
+        // Estrategia 2: Modal mode - response es directamente el resultado
+        else if (response && response.success !== undefined) {
+          console.log('✅ Estrategia 2: Modal mode (response directo)');
           actualData = response;
-        } else {
-          console.log('⚠️ Estrategia 3: Usar response tal cual');
+        }
+        // Estrategia 3: Response es el resultado sin envolver
+        else {
+          console.log('⚠️ Estrategia 3: Response sin estructura conocida');
           actualData = response;
         }
 
-        console.log('🔍 actualData después de extracción:', actualData);
+        console.log('🔍 actualData:', actualData);
+        console.log('🔍 actualData.success:', actualData?.success);
+        console.log('🔍 actualData.data:', actualData?.data);
+        console.log('🔍 actualData.data es array:', Array.isArray(actualData?.data));
 
-        if (actualData && actualData.success && Array.isArray(actualData.data)) {
-          reportes = actualData.data;
-          console.log(`✅ ÉXITO: ${reportes.length} reportes encontrados`);
-          if (reportes.length > 0) {
-            console.log('📋 Reporte[0]:', reportes[0]);
+        // Verificar si tenemos un array válido de reportes
+        if (actualData) {
+          // Caso 1: success=true y data es array
+          if (actualData.success === true && Array.isArray(actualData.data)) {
+            arrayReportes = actualData.data;
+            console.log(`✅ Caso 1: Array de reportes en actualData.data (${arrayReportes.length} items)`);
+          }
+          // Caso 2: success=false (error del backend)
+          else if (actualData.success === false) {
+            errorMessage = actualData.message || 'Error del servidor';
+            console.error('❌ Caso 2: Backend retornó error:', errorMessage);
+          }
+          // Caso 3: data existe pero no es array
+          else if (actualData.data !== undefined && !Array.isArray(actualData.data)) {
+            errorMessage = 'La respuesta contiene data pero no es un array';
+            console.error('❌ Caso 3:', errorMessage, 'data:', actualData.data);
+          }
+          // Caso 4: estructura inesperada
+          else {
+            errorMessage = actualData.message || 'Estructura de respuesta no reconocida';
+            console.error('❌ Caso 4: Estructura inesperada');
+            console.error('actualData completo:', JSON.stringify(actualData, null, 2));
           }
         } else {
-          errorMessage = actualData?.message || 'Estructura de respuesta no reconocida';
-          console.error('❌ ERROR: No se pudo extraer array de reportes');
-          console.error('actualData:', actualData);
+          errorMessage = 'Respuesta vacía del servidor';
+          console.error('❌ actualData es null/undefined');
+        }
+
+        // Asignar reportes si se encontraron
+        if (arrayReportes && arrayReportes.length > 0) {
+          reportes = arrayReportes;
+          console.log(`✅ ÉXITO: ${reportes.length} reportes encontrados`);
+          console.log('📋 Primer reporte:', reportes[0]);
+        } else if (arrayReportes) {
+          console.log('⚠️ Array de reportes vacío (sin errores)');
         }
       } catch (error) {
         hideLoading();
