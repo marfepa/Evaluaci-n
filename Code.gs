@@ -93,29 +93,74 @@ function doPost(e) {
 
     Logger.log(`Calling function: ${functionName} with args: ${JSON.stringify(args)}`);
 
-    // ✅ Mejorado: Buscar la función en el contexto global de Apps Script
-    // Apps Script no tiene globalThis, pero podemos usar eval para acceder a funciones globales
-    let globalFunc;
-    try {
-      // Intentar acceder a la función directamente por nombre
-      globalFunc = eval(functionName);
-    } catch (evalError) {
-      Logger.log(`Could not eval function: ${evalError.message}`);
-      throw new Error(`Function ${functionName} not found or not callable`);
+    // ✅ MAPA EXPLÍCITO DE FUNCIONES DISPONIBLES PARA WEB APP
+    const availableFunctions = {
+      // Estadísticas y datos básicos
+      'getStatistics': getStatistics,
+      'getEstudiantesData': getEstudiantesData,
+      'getInstrumentosData': getInstrumentosData,
+      'getCourses': getCourses,
+      'getSchools': getSchools,
+      'getWebAppUrl': getWebAppUrl,
+
+      // Asistencia
+      'reportePorEstudiante': reportePorEstudiante,
+      'reportePorCurso': reportePorCurso,
+      'compararEstudiantes': compararEstudiantes,
+      'compararCursos': compararCursos,
+      'registrarAsistenciaBatch': registrarAsistenciaBatch,
+      'getRecentAttendance': getRecentAttendance,
+      'reporteAsistenciaAvanzada_UI': reporteAsistenciaAvanzada_UI,
+
+      // Calificaciones
+      'reporteCalificacionPorEstudiante': reporteCalificacionPorEstudiante,
+      'reporteCalificacionPorCurso': reporteCalificacionPorCurso,
+      'compararCalificacionesEstudiantes': compararCalificacionesEstudiantes,
+      'compararCalificacionesCursos': compararCalificacionesCursos,
+
+      // Reportes y situaciones
+      'getCursosSituacionesMapping': getCursosSituacionesMapping,
+      'generateReporteNotasSituacion': generateReporteNotasSituacion,
+      'getHojasReportes': getHojasReportes,
+      'getInstrumentosDeReporte': getInstrumentosDeReporte,
+      'calcularMediaPonderada': calcularMediaPonderada,
+
+      // ✅ FUNCIONES DE REPORTES EXISTENTES
+      'listarReportesExistentes': listarReportesExistentes,
+      'leerReporteExistente': leerReporteExistente,
+      'exportarReportePDF': exportarReportePDF,
+      'descargarReportePDF': descargarReportePDF,
+
+      // Sistema de alertas
+      'diagnosticarSistemaAlertas': diagnosticarSistemaAlertas,
+      'openSchedulerDialog': openSchedulerDialog,
+      'openConfigDialog': openConfigDialog
+    };
+
+    // Verificar si la función existe en el mapa
+    const targetFunction = availableFunctions[functionName];
+
+    if (!targetFunction) {
+      Logger.log(`Function ${functionName} not found in available functions map`);
+      Logger.log('Available functions: ' + Object.keys(availableFunctions).join(', '));
+      throw new Error(`Function "${functionName}" is not available in Web App mode`);
     }
 
-    if (typeof globalFunc !== 'function') {
-      throw new Error(`${functionName} is not a function (type: ${typeof globalFunc})`);
+    if (typeof targetFunction !== 'function') {
+      throw new Error(`${functionName} is not a function (type: ${typeof targetFunction})`);
     }
 
     // Llamar a la función con los argumentos
-    const result = globalFunc.apply(null, args);
+    const result = targetFunction.apply(null, args);
 
     Logger.log(`Function ${functionName} executed successfully`);
 
     // Retornar el resultado como JSON
     return ContentService
-      .createTextOutput(JSON.stringify({ success: true, result: result }))
+      .createTextOutput(JSON.stringify({
+        success: true,
+        result: result
+      }))
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
