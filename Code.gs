@@ -2370,6 +2370,9 @@ function reporteAsistenciaAvanzada_UI() {
  */
 function listarReportesExistentes() {
   try {
+    Logger.log('=== INICIO listarReportesExistentes ===');
+    Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
+
     // Validar que SPREADSHEET_ID esté configurado
     if (!SPREADSHEET_ID || SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
       Logger.log('ERROR: SPREADSHEET_ID no está configurado correctamente');
@@ -2378,9 +2381,6 @@ function listarReportesExistentes() {
         message: 'Error de configuración: SPREADSHEET_ID no está definido. Por favor, configura el ID de tu hoja de cálculo en Code.gs'
       };
     }
-
-    Logger.log('=== INICIO listarReportesExistentes ===');
-    Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
 
     let ss;
     let metodoAcceso = '';
@@ -2392,9 +2392,7 @@ function listarReportesExistentes() {
       Logger.log('✓ Éxito con openById');
     } catch (ssError) {
       Logger.log('✖ Falló openById: ' + ssError.message);
-      Logger.log('Stack: ' + (ssError.stack || 'N/A'));
 
-      // Intentar con el spreadsheet activo como fallback
       try {
         Logger.log('Método 2: Intentando SpreadsheetApp.getActiveSpreadsheet...');
         ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2402,18 +2400,15 @@ function listarReportesExistentes() {
         Logger.log('✓ Éxito con getActiveSpreadsheet');
       } catch (activeError) {
         Logger.log('✖ Falló getActiveSpreadsheet: ' + activeError.message);
-        Logger.log('Stack: ' + (activeError.stack || 'N/A'));
-
         return {
           success: false,
-          message: 'No se puede acceder al spreadsheet. Error original: ' + ssError.message + '. Error fallback: ' + activeError.message
+          message: 'No se puede acceder al spreadsheet. Error: ' + ssError.message
         };
       }
     }
 
     Logger.log('Spreadsheet abierto con método: ' + metodoAcceso);
     Logger.log('Spreadsheet ID real: ' + ss.getId());
-    Logger.log('Spreadsheet nombre: ' + ss.getName());
 
     let sheets;
     try {
@@ -2566,20 +2561,24 @@ function listarReportesExistentes() {
         info = { descripcion: 'Diagnóstico del sistema' };
       }
 
-      // Agregar TODAS las pestañas a la lista (sin filtro)
-      // Si no se identificó un tipo específico, usar 'general'
-      reportes.push({
-        nombre: nombre,
-        tipo: tipo || 'general',
-        subtipo: subtipo || 'general',
-        info: info.descripcion ? info : { descripcion: nombre },
-        ultimaModificacion: ultimaModificacion
-      });
+      // Agregar TODAS las hojas identificadas
+      if (tipo) {
+        reportes.push({
+          nombre: nombre,
+          tipo: tipo,
+          subtipo: subtipo,
+          info: info,
+          ultimaModificacion: ultimaModificacion
+        });
+        Logger.log('  ✓ Agregado como: ' + tipo + '/' + subtipo);
+      } else {
+        Logger.log('  - No es un reporte reconocido');
+      }
     });
 
     Logger.log('Total de reportes identificados: ' + reportes.length);
 
-    // Ordenar por nombre (alfabéticamente) ya que todos tienen la misma fecha
+    // Ordenar por nombre
     try {
       reportes.sort((a, b) => {
         const nombreA = a.nombre || '';
@@ -2589,14 +2588,6 @@ function listarReportesExistentes() {
       Logger.log('✓ Reportes ordenados correctamente');
     } catch (sortError) {
       Logger.log('⚠️ Error al ordenar reportes: ' + sortError.message);
-    }
-
-    // Intentar loggear los nombres de reportes de forma segura
-    try {
-      const nombres = reportes.map(r => r.nombre || '(sin nombre)').join(', ');
-      Logger.log('Reportes encontrados: ' + nombres);
-    } catch (logError) {
-      Logger.log('⚠️ No se pudo loggear nombres de reportes: ' + logError.message);
     }
 
     Logger.log('=== FIN listarReportesExistentes - Retornando éxito con ' + reportes.length + ' reportes ===');
@@ -2612,7 +2603,7 @@ function listarReportesExistentes() {
     Logger.log(errorMsg);
     return {
       success: false,
-      message: 'Error al obtener reportes: ' + error.message + '. Revisa la consola de Apps Script para más detalles.'
+      message: 'Error al obtener reportes: ' + error.message
     };
   }
 }

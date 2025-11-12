@@ -2836,90 +2836,51 @@
       try {
         console.log('🔄 Llamando a listarReportesExistentes...');
         console.log('Modo:', isModalMode ? 'Modal' : 'Web App');
+
         const response = await callBackend('listarReportesExistentes');
-        console.log('✅ Respuesta RAW completa:', response);
-        console.log('Tipo:', typeof response);
-        console.log('Keys:', response ? Object.keys(response) : 'null');
+        console.log('✅ Respuesta completa:', JSON.stringify(response, null, 2));
+
         hideLoading();
 
-        // Debug exhaustivo de la estructura
-        if (response) {
-          console.log('📊 response.success:', response.success);
-          console.log('📊 response.result:', response.result);
-          console.log('📊 response.data:', response.data);
-          console.log('📊 response.result?.success:', response.result?.success);
-          console.log('📊 response.result?.data:', response.result?.data);
-        }
-
-        // Extraer datos de la respuesta con manejo robusto
+        // SIMPLIFICADO: Unwrapping robusto
         let actualData = null;
-        let arrayReportes = null;
 
-        // Estrategia 1: Web App mode - response.result contiene el resultado
+        // Caso 1: Web App mode - response tiene success y result
         if (response && response.success && response.result) {
-          console.log('✅ Estrategia 1: Web App mode (response.result)');
+          console.log('✅ Caso 1: Web App mode detectado');
           actualData = response.result;
         }
-        // Estrategia 2: Modal mode - response es directamente el resultado
+        // Caso 2: Modal mode o respuesta directa
         else if (response && response.success !== undefined) {
-          console.log('✅ Estrategia 2: Modal mode (response directo)');
+          console.log('✅ Caso 2: Modal mode o respuesta directa');
           actualData = response;
         }
-        // Estrategia 3: Response es el resultado sin envolver
+        // Caso 3: Respuesta inesperada
         else {
-          console.log('⚠️ Estrategia 3: Response sin estructura conocida');
+          console.log('⚠️ Caso 3: Respuesta inesperada');
           actualData = response;
         }
 
         console.log('🔍 actualData:', actualData);
-        console.log('🔍 actualData.success:', actualData?.success);
-        console.log('🔍 actualData.data:', actualData?.data);
-        console.log('🔍 actualData.data es array:', Array.isArray(actualData?.data));
 
-        // Verificar si tenemos un array válido de reportes
-        if (actualData) {
-          // Caso 1: success=true y data es array
-          if (actualData.success === true && Array.isArray(actualData.data)) {
-            arrayReportes = actualData.data;
-            console.log(`✅ Caso 1: Array de reportes en actualData.data (${arrayReportes.length} items)`);
-          }
-          // Caso 2: success=false (error del backend)
-          else if (actualData.success === false) {
-            errorMessage = actualData.message || 'Error del servidor';
-            console.error('❌ Caso 2: Backend retornó error:', errorMessage);
-          }
-          // Caso 3: data existe pero no es array
-          else if (actualData.data !== undefined && !Array.isArray(actualData.data)) {
-            errorMessage = 'La respuesta contiene data pero no es un array';
-            console.error('❌ Caso 3:', errorMessage, 'data:', actualData.data);
-          }
-          // Caso 4: estructura inesperada
-          else {
-            errorMessage = actualData.message || 'Estructura de respuesta no reconocida';
-            console.error('❌ Caso 4: Estructura inesperada');
-            console.error('actualData completo:', JSON.stringify(actualData, null, 2));
-          }
+        // Validar y extraer array de reportes
+        if (actualData && actualData.success === true && Array.isArray(actualData.data)) {
+          reportes = actualData.data;
+          console.log(`✅ ${reportes.length} reportes encontrados`);
+        } else if (actualData && actualData.success === false) {
+          errorMessage = actualData.message || 'Error del servidor';
+          console.error('❌ Backend retornó error:', errorMessage);
         } else {
-          errorMessage = 'Respuesta vacía del servidor';
-          console.error('❌ actualData es null/undefined');
-        }
-
-        // Asignar reportes si se encontraron
-        if (arrayReportes && arrayReportes.length > 0) {
-          reportes = arrayReportes;
-          console.log(`✅ ÉXITO: ${reportes.length} reportes encontrados`);
-          console.log('📋 Primer reporte:', reportes[0]);
-        } else if (arrayReportes) {
-          console.log('⚠️ Array de reportes vacío (sin errores)');
+          errorMessage = actualData?.message || 'No se encontraron reportes o estructura de respuesta inválida';
+          console.error('❌ Estructura inesperada:', actualData);
         }
       } catch (error) {
         hideLoading();
         errorMessage = 'Error de conexión: ' + error.message;
         console.error('❌ EXCEPCIÓN:', error);
-        console.error('Stack:', error.stack);
       }
 
-      console.log(`Renderizando lista con ${reportes.length} reportes en el Dashboard...`);
+      console.log(`📊 Renderizando lista con ${reportes.length} reportes en el Dashboard...`);
 
       // Agrupar reportes por tipo
       const reportesPorTipo = {
@@ -3140,18 +3101,16 @@
         console.log('Respuesta de leerReporteExistente:', response);
         hideLoading();
 
-        // Aplicar el mismo unwrapping que en viewExistingReports
-        if (response && response.success) {
-          const actualData = response.result || response;
-          console.log('Datos después de unwrap:', actualData);
+        // Unwrapping simplificado
+        let actualData = response;
+        if (response && response.success && response.result) {
+          actualData = response.result;
+        }
 
-          if (actualData && actualData.success) {
-            showReportResults(nombreHoja, actualData.data);
-          } else {
-            showError('Error', actualData?.message || 'No se pudo cargar el reporte');
-          }
+        if (actualData && actualData.success && actualData.data) {
+          showReportResults(nombreHoja, actualData.data);
         } else {
-          showError('Error', response?.message || 'No se pudo cargar el reporte');
+          showError('Error', actualData?.message || 'No se pudo cargar el reporte');
         }
       } catch (err) {
         hideLoading();
