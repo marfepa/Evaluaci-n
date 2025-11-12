@@ -2432,8 +2432,23 @@ function listarReportesExistentes() {
 
     const reportes = [];
 
+    // Lista de hojas principales del sistema a ignorar
+    const hojasPrincipales = [
+      'Estudiantes', 'InstrumentosEvaluacion', 'SituacionesAprendizaje',
+      'CalificacionesDetalladas', 'RegistroAsistencia', 'Maestro_CriteriosRubrica',
+      'Maestro_NivelesRubrica', 'Definicion_Rubricas', 'Definicion_ListasCotejo',
+      'ConfiguracionAlertas', 'Scheduler'
+    ];
+
     sheets.forEach(sheet => {
       const nombre = sheet.getName();
+
+      // Ignorar hojas principales del sistema
+      if (hojasPrincipales.includes(nombre)) {
+        Logger.log('⏭️ Ignorando hoja del sistema: ' + nombre);
+        return;
+      }
+
       let tipo = null;
       let subtipo = null;
       let info = {};
@@ -2441,7 +2456,7 @@ function listarReportesExistentes() {
       Logger.log('Analizando hoja: "' + nombre + '"');
 
       // ========================================
-      // 📊 REPORTES DE NOTAS
+      // 📊 REPORTES DE NOTAS POR SITUACIÓN
       // ========================================
 
       // 1. Reportes de notas por situación (formato: "RepNotas CURSO-SITUACION")
@@ -2450,37 +2465,41 @@ function listarReportesExistentes() {
         tipo = 'notas';
         subtipo = 'situacion';
         const resto = nombre.substring(9); // Quitar "RepNotas "
-        const dashIndex = resto.indexOf('-');
-        if (dashIndex > 0) {
+        const partes = resto.split('-');
+        if (partes.length >= 2) {
           info = {
-            curso: resto.substring(0, dashIndex).trim(),
-            situacion: resto.substring(dashIndex + 1).trim(),
-            descripcion: `Notas: ${resto.substring(0, dashIndex).trim()} - ${resto.substring(dashIndex + 1).trim()}`
+            curso: partes[0].trim(),
+            situacion: partes.slice(1).join('-').trim(), // Por si la situación tiene guiones
+            descripcion: `Notas de ${partes[0].trim()} - ${partes.slice(1).join('-').trim()}`
           };
         } else {
           info = {
-            descripcion: resto.trim() || 'Reporte de notas'
+            descripcion: resto || 'Reporte de notas'
           };
         }
       }
 
+      // ========================================
+      // 📈 REPORTES DE CALIFICACIONES
+      // ========================================
+
       // 2. Reportes de calificaciones por estudiante
       else if (nombre === 'Reporte_Calif_Estudiante') {
-        tipo = 'notas';
+        tipo = 'calificaciones';
         subtipo = 'estudiante';
         info = { descripcion: 'Calificaciones por estudiante' };
       }
 
       // 3. Reportes de calificaciones por curso
       else if (nombre === 'Reporte_Calif_Curso') {
-        tipo = 'notas';
+        tipo = 'calificaciones';
         subtipo = 'curso';
         info = { descripcion: 'Calificaciones por curso' };
       }
 
       // 4. Reportes generales de calificaciones
       else if (nombre === 'Reporte_Calificaciones') {
-        tipo = 'notas';
+        tipo = 'calificaciones';
         subtipo = 'general';
         info = { descripcion: 'Reporte general de calificaciones' };
       }
@@ -2502,12 +2521,14 @@ function listarReportesExistentes() {
       }
       else if (nombre === 'Reporte_Avanzado_Asistencia') {
         tipo = 'asistencia';
-        subtipo = 'avanzado_completo';
-        info = { descripcion: 'Reporte completo de asistencia con estadísticas' };
+        subtipo = 'avanzado';
+        info = { descripcion: 'Reporte avanzado con estadísticas' };
       }
 
       // 2. Reportes de asistencia con fecha o sufijo
-      else if (nombre.startsWith('Reporte_Asistencia_') && nombre !== 'Reporte_Asistencia_Av' && nombre !== 'Reporte_Asistencia_Av_Diario') {
+      else if (nombre.startsWith('Reporte_Asistencia_') &&
+               nombre !== 'Reporte_Asistencia_Av' &&
+               nombre !== 'Reporte_Asistencia_Av_Diario') {
         tipo = 'asistencia';
         subtipo = 'fecha';
         const sufijo = nombre.substring(19); // Quitar "Reporte_Asistencia_"
@@ -2521,38 +2542,38 @@ function listarReportesExistentes() {
       else if (nombre === 'Reporte_Asistencia') {
         tipo = 'asistencia';
         subtipo = 'simple';
-        info = { descripcion: 'Reporte de asistencia' };
+        info = { descripcion: 'Reporte general de asistencia' };
       }
 
       // ========================================
       // 🔄 COMPARATIVAS
       // ========================================
 
-      // 1. Comparativas de estudiantes
+      // 1. Comparativas de asistencia entre estudiantes
       else if (nombre === 'Comparativa_Estudiantes') {
         tipo = 'comparativa';
-        subtipo = 'estudiantes';
-        info = { descripcion: 'Comparativa entre estudiantes' };
+        subtipo = 'estudiantes_asistencia';
+        info = { descripcion: 'Comparativa de asistencia entre estudiantes' };
       }
 
-      // 2. Comparativas de cursos
+      // 2. Comparativas de asistencia entre cursos
       else if (nombre === 'Comparativa_Cursos') {
         tipo = 'comparativa';
-        subtipo = 'cursos';
-        info = { descripcion: 'Comparativa entre cursos' };
+        subtipo = 'cursos_asistencia';
+        info = { descripcion: 'Comparativa de asistencia entre cursos' };
       }
 
       // 3. Comparativas de calificaciones por estudiantes
       else if (nombre === 'Comparativa_Calificaciones_Estudiantes' || nombre === 'Comparativa_Calif_Est') {
         tipo = 'comparativa';
-        subtipo = 'calificaciones_estudiantes';
+        subtipo = 'estudiantes_calificaciones';
         info = { descripcion: 'Comparativa de calificaciones entre estudiantes' };
       }
 
       // 4. Comparativas de calificaciones por cursos
       else if (nombre === 'Comparativa_Calificaciones_Cursos' || nombre === 'Comparativa_Calif_Cursos') {
         tipo = 'comparativa';
-        subtipo = 'calificaciones_cursos';
+        subtipo = 'cursos_calificaciones';
         info = { descripcion: 'Comparativa de calificaciones entre cursos' };
       }
 
@@ -2563,18 +2584,22 @@ function listarReportesExistentes() {
       else if (nombre === 'Diagnostico_Sistema') {
         tipo = 'diagnostico';
         subtipo = 'sistema';
-        info = { descripcion: 'Diagnóstico del sistema' };
+        info = { descripcion: 'Diagnóstico del sistema de alertas' };
       }
 
-      // Agregar TODAS las pestañas a la lista (sin filtro)
-      // Si no se identificó un tipo específico, usar 'general'
-      reportes.push({
-        nombre: nombre,
-        tipo: tipo || 'general',
-        subtipo: subtipo || 'general',
-        info: info.descripcion ? info : { descripcion: nombre },
-        ultimaModificacion: ultimaModificacion
-      });
+      // Solo añadir si se identificó como un reporte
+      if (tipo) {
+        reportes.push({
+          nombre: nombre,
+          tipo: tipo,
+          subtipo: subtipo,
+          info: info,
+          ultimaModificacion: ultimaModificacion
+        });
+        Logger.log(`✅ Añadido: ${nombre} [${tipo}/${subtipo}]`);
+      } else {
+        Logger.log('⏭️ Ignorando hoja no-reporte: ' + nombre);
+      }
     });
 
     Logger.log('Total de reportes identificados: ' + reportes.length);
