@@ -1212,8 +1212,42 @@
             Visualiza reportes ya generados sin duplicar información.
           </div>
           <button class="btn btn-success" onclick="viewExistingReports()">
-            Ver Reportes
+            Listar Reportes
           </button>
+        </div>
+      </div>
+
+      <!-- Área para mostrar la lista de reportes existentes -->
+      <div id="reportes-existentes-container" style="margin-top: 24px; display: none;">
+        <div class="card" style="max-width: 100%;">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3em;">📊</span>
+                <span>Reportes Existentes</span>
+              </h3>
+              <span id="reportes-badge" style="background: #f1f5f9; padding: 6px 12px; border-radius: 8px; font-size: 0.875em; font-weight: 600; color: #64748b;">
+                0 reportes
+              </span>
+            </div>
+            <button class="btn btn-outline" onclick="ocultarListaReportes()" style="padding: 8px 16px;">
+              ✕ Ocultar
+            </button>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <div id="reportes-search-container" style="margin-bottom: 20px; display: none;">
+              <input
+                type="text"
+                id="search-reportes-dashboard"
+                class="form-input"
+                placeholder="🔍 Buscar reportes por nombre, curso o situación..."
+                style="width: 100%; padding: 10px 12px; font-size: 0.9em;"
+              />
+            </div>
+            <div id="reportes-lista-dashboard">
+              <!-- La lista de reportes se insertará aquí -->
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2851,247 +2885,237 @@
         console.error('Stack:', error.stack);
       }
 
-      console.log(`Creando diálogo con ${reportes.length} reportes...`);
+      console.log(`Renderizando lista con ${reportes.length} reportes en el Dashboard...`);
 
-        // Crear diálogo para seleccionar reporte
-        const dialog = document.createElement('div');
-        dialog.className = 'modal';
+      // Agrupar reportes por tipo
+      const reportesPorTipo = {
+        notas: reportes.filter(r => r.tipo === 'notas'),
+        asistencia: reportes.filter(r => r.tipo === 'asistencia'),
+        comparativa: reportes.filter(r => r.tipo === 'comparativa'),
+        diagnostico: reportes.filter(r => r.tipo === 'diagnostico')
+      };
 
-        // Agrupar reportes por tipo
-        const reportesPorTipo = {
-          notas: reportes.filter(r => r.tipo === 'notas'),
-          asistencia: reportes.filter(r => r.tipo === 'asistencia'),
-          comparativa: reportes.filter(r => r.tipo === 'comparativa'),
-          diagnostico: reportes.filter(r => r.tipo === 'diagnostico')
+      const formatFecha = (fecha) => {
+        try {
+          return new Date(fecha).toLocaleString('es-ES', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        } catch {
+          return 'Fecha desconocida';
+        }
+      };
+
+      // Obtener badge color según el subtipo
+      const getBadgeStyle = (subtipo) => {
+        const styles = {
+          situacion: 'background: rgba(37, 99, 235, 0.1); color: #2563eb;',
+          estudiante: 'background: rgba(16, 185, 129, 0.1); color: #10b981;',
+          curso: 'background: rgba(245, 158, 11, 0.1); color: #f59e0b;',
+          avanzado: 'background: rgba(139, 92, 246, 0.1); color: #8b5cf6;',
+          simple: 'background: rgba(100, 116, 139, 0.1); color: #64748b;',
+          fecha: 'background: rgba(236, 72, 153, 0.1); color: #ec4899;',
+          estudiantes: 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9;',
+          cursos: 'background: rgba(251, 146, 60, 0.1); color: #fb923c;',
+          sistema: 'background: rgba(239, 68, 68, 0.1); color: #ef4444;'
         };
+        return styles[subtipo] || 'background: rgba(100, 116, 139, 0.1); color: #64748b;';
+      };
 
-        const formatFecha = (fecha) => {
-          try {
-            return new Date(fecha).toLocaleString('es-ES', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
-          } catch {
-            return 'Fecha desconocida';
-          }
-        };
-
-        // Obtener badge color según el subtipo
-        const getBadgeStyle = (subtipo) => {
-          const styles = {
-            situacion: 'background: rgba(37, 99, 235, 0.1); color: #2563eb;',
-            estudiante: 'background: rgba(16, 185, 129, 0.1); color: #10b981;',
-            curso: 'background: rgba(245, 158, 11, 0.1); color: #f59e0b;',
-            avanzado: 'background: rgba(139, 92, 246, 0.1); color: #8b5cf6;',
-            simple: 'background: rgba(100, 116, 139, 0.1); color: #64748b;',
-            fecha: 'background: rgba(236, 72, 153, 0.1); color: #ec4899;',
-            estudiantes: 'background: rgba(14, 165, 233, 0.1); color: #0ea5e9;',
-            cursos: 'background: rgba(251, 146, 60, 0.1); color: #fb923c;',
-            sistema: 'background: rgba(239, 68, 68, 0.1); color: #ef4444;'
-          };
-          return styles[subtipo] || 'background: rgba(100, 116, 139, 0.1); color: #64748b;';
-        };
-
-        const crearListaReportes = (listaReportes, titulo, icono, color = '#2563eb') => {
-          if (listaReportes.length === 0) return '';
-          return `
-            <div style="margin-bottom: 24px;">
-              <h4 style="color: ${color}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.3em;">${icono}</span>
-                <span>${titulo}</span>
-                <span style="background: ${color}15; color: ${color}; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 600;">${listaReportes.length}</span>
-              </h4>
-              <div style="display: flex; flex-direction: column; gap: 8px;">
-                ${listaReportes.map(r => `
-                  <button
-                    class="btn btn-outline"
-                    style="text-align: left; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;"
-                    onclick="loadReport('${r.nombre}')"
-                    onmouseover="this.style.transform='translateX(4px)'; this.style.borderColor='${color}'; this.style.backgroundColor='${color}05';"
-                    onmouseout="this.style.transform='translateX(0)'; this.style.borderColor='#e2e8f0'; this.style.backgroundColor='transparent';"
-                  >
-                    <div style="flex: 1;">
-                      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                        <span style="font-weight: 600; color: #1e293b;">${r.nombre}</span>
-                        ${r.subtipo ? `<span style="padding: 2px 8px; border-radius: 999px; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; ${getBadgeStyle(r.subtipo)}">${r.subtipo.replace(/_/g, ' ')}</span>` : ''}
-                      </div>
-                      <div style="font-size: 0.85em; color: #64748b;">
-                        ${r.info.descripcion || (r.info.curso && r.info.situacion ? `${r.info.curso} - ${r.info.situacion}` : r.info.fecha || '')}
-                      </div>
+      const crearListaReportes = (listaReportes, titulo, icono, color = '#2563eb') => {
+        if (listaReportes.length === 0) return '';
+        return `
+          <div style="margin-bottom: 24px;">
+            <h4 style="color: ${color}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3em;">${icono}</span>
+              <span>${titulo}</span>
+              <span style="background: ${color}15; color: ${color}; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 600;">${listaReportes.length}</span>
+            </h4>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${listaReportes.map(r => `
+                <button
+                  class="btn btn-outline"
+                  style="text-align: left; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;"
+                  onclick="loadReportInDashboard('${r.nombre}')"
+                  onmouseover="this.style.transform='translateX(4px)'; this.style.borderColor='${color}'; this.style.backgroundColor='${color}05';"
+                  onmouseout="this.style.transform='translateX(0)'; this.style.borderColor='#e2e8f0'; this.style.backgroundColor='transparent';"
+                >
+                  <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                      <span style="font-weight: 600; color: #1e293b;">${r.nombre}</span>
+                      ${r.subtipo ? `<span style="padding: 2px 8px; border-radius: 999px; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; ${getBadgeStyle(r.subtipo)}">${r.subtipo.replace(/_/g, ' ')}</span>` : ''}
                     </div>
-                    <div style="font-size: 0.75em; color: #94a3b8; text-align: right; margin-left: 12px;">
-                      <div>${formatFecha(r.ultimaModificacion)}</div>
+                    <div style="font-size: 0.85em; color: #64748b;">
+                      ${r.info.descripcion || (r.info.curso && r.info.situacion ? `${r.info.curso} - ${r.info.situacion}` : r.info.fecha || '')}
                     </div>
-                  </button>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        };
-
-        // Contar total de reportes
-        const totalReportes = reportes.length;
-
-        // Mostrar mensaje de error si existe
-        const mensajeError = errorMessage ? `
-          <div class="alert alert-error" style="margin-bottom: 20px;">
-            <span style="font-size: 1.2em;">⚠️</span>
-            <div>
-              <strong>Error al cargar reportes</strong>
-              <p style="margin: 4px 0 0 0; font-size: 0.9em;">${errorMessage}</p>
-            </div>
-          </div>
-        ` : '';
-
-        const contenidoReportes = totalReportes > 0 ? `
-            ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas y Calificaciones', '📝', '#2563eb')}
-            ${crearListaReportes(reportesPorTipo.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
-            ${crearListaReportes(reportesPorTipo.comparativa, 'Comparativas', '📈', '#f59e0b')}
-            ${crearListaReportes(reportesPorTipo.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
-          ` : `
-            <div style="text-align: center; padding: 40px 20px; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
-              <div style="font-size: 3em; margin-bottom: 16px; opacity: 0.5;">📊</div>
-              <h4 style="color: #64748b; margin-bottom: 8px; font-weight: 600;">No hay reportes disponibles</h4>
-              <p style="color: #94a3b8; font-size: 0.9em;">Genera reportes desde las opciones del menú para visualizarlos aquí</p>
-            </div>
-          `;
-
-        dialog.innerHTML = `
-          <div class="modal-content" style="max-width: 800px; max-height: 85vh; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <h3 style="margin: 0;">📊 Reportes Existentes</h3>
-              <span style="background: #f1f5f9; padding: 6px 12px; border-radius: 8px; font-size: 0.875em; font-weight: 600; color: #64748b;">
-                <span id="reporte-count">${totalReportes}</span> ${totalReportes === 1 ? 'reporte' : 'reportes'}
-              </span>
-            </div>
-
-            ${mensajeError}
-
-            ${totalReportes > 0 ? `
-              <p style="color: #64748b; margin-bottom: 12px; font-size: 0.95em;">
-                Selecciona un reporte para visualizar sus datos
-              </p>
-              <div style="margin-bottom: 20px;">
-                <input
-                  type="text"
-                  id="search-reportes"
-                  class="form-input"
-                  placeholder="🔍 Buscar reportes por nombre, curso o situación..."
-                  style="width: 100%; padding: 10px 12px; font-size: 0.9em;"
-                />
-              </div>
-            ` : ''}
-
-            <div id="reportes-container">
-              ${contenidoReportes}
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-              <button class="btn btn-outline" id="btn-cancelar-reportes" style="flex: 1;">Cerrar</button>
+                  </div>
+                  <div style="font-size: 0.75em; color: #94a3b8; text-align: right; margin-left: 12px;">
+                    <div>${formatFecha(r.ultimaModificacion)}</div>
+                  </div>
+                </button>
+              `).join('')}
             </div>
           </div>
         `;
+      };
 
-        document.body.appendChild(dialog);
-        dialog.classList.add('active');
+      // Contar total de reportes
+      const totalReportes = reportes.length;
 
-        // Añadir manejadores
-        document.getElementById('btn-cancelar-reportes').addEventListener('click', () => {
-          dialog.remove();
-        });
+      // Mostrar mensaje de error si existe
+      const mensajeError = errorMessage ? `
+        <div class="alert alert-error" style="margin-bottom: 20px;">
+          <span style="font-size: 1.2em;">⚠️</span>
+          <div>
+            <strong>Error al cargar reportes</strong>
+            <p style="margin: 4px 0 0 0; font-size: 0.9em;">${errorMessage}</p>
+          </div>
+        </div>
+      ` : '';
 
-        // Funcionalidad de búsqueda
-        if (totalReportes > 0) {
-          const searchInput = document.getElementById('search-reportes');
-          const reportesContainer = document.getElementById('reportes-container');
-          const reporteCountSpan = document.getElementById('reporte-count');
+      const contenidoReportes = totalReportes > 0 ? `
+          ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas y Calificaciones', '📝', '#2563eb')}
+          ${crearListaReportes(reportesPorTipo.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
+          ${crearListaReportes(reportesPorTipo.comparativa, 'Comparativas', '📈', '#f59e0b')}
+          ${crearListaReportes(reportesPorTipo.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
+        ` : `
+          <div style="text-align: center; padding: 40px 20px; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+            <div style="font-size: 3em; margin-bottom: 16px; opacity: 0.5;">📊</div>
+            <h4 style="color: #64748b; margin-bottom: 8px; font-weight: 600;">No hay reportes disponibles</h4>
+            <p style="color: #94a3b8; font-size: 0.9em;">Genera reportes desde las opciones del menú para visualizarlos aquí</p>
+          </div>
+        `;
 
-          searchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase().trim();
+      // Renderizar en el Dashboard
+      const container = document.getElementById('reportes-existentes-container');
+      const listaDashboard = document.getElementById('reportes-lista-dashboard');
+      const badge = document.getElementById('reportes-badge');
+      const searchContainer = document.getElementById('reportes-search-container');
 
-            if (searchTerm === '') {
-              // Mostrar todos los reportes
-              reportesContainer.innerHTML = contenidoReportes;
-              reporteCountSpan.textContent = totalReportes;
-              return;
-            }
+      // Actualizar badge
+      badge.textContent = `${totalReportes} ${totalReportes === 1 ? 'reporte' : 'reportes'}`;
 
-            // Filtrar reportes
-            const reportesFiltrados = {
-              notas: reportesPorTipo.notas.filter(r =>
-                r.nombre.toLowerCase().includes(searchTerm) ||
-                (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm)) ||
-                (r.info.curso && r.info.curso.toLowerCase().includes(searchTerm)) ||
-                (r.info.situacion && r.info.situacion.toLowerCase().includes(searchTerm))
-              ),
-              asistencia: reportesPorTipo.asistencia.filter(r =>
-                r.nombre.toLowerCase().includes(searchTerm) ||
-                (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm)) ||
-                (r.info.fecha && r.info.fecha.toLowerCase().includes(searchTerm))
-              ),
-              comparativa: reportesPorTipo.comparativa.filter(r =>
-                r.nombre.toLowerCase().includes(searchTerm) ||
-                (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
-              ),
-              diagnostico: reportesPorTipo.diagnostico.filter(r =>
-                r.nombre.toLowerCase().includes(searchTerm) ||
-                (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
-              )
-            };
+      // Insertar contenido
+      listaDashboard.innerHTML = mensajeError + contenidoReportes;
 
-            const totalFiltrados = Object.values(reportesFiltrados).reduce((sum, arr) => sum + arr.length, 0);
-            reporteCountSpan.textContent = totalFiltrados;
+      // Mostrar/ocultar búsqueda según si hay reportes
+      if (totalReportes > 0) {
+        searchContainer.style.display = 'block';
+      } else {
+        searchContainer.style.display = 'none';
+      }
 
-            if (totalFiltrados === 0) {
-              reportesContainer.innerHTML = `
-                <div style="text-align: center; padding: 40px 20px; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
-                  <div style="font-size: 3em; margin-bottom: 16px; opacity: 0.5;">🔍</div>
-                  <h4 style="color: #64748b; margin-bottom: 8px; font-weight: 600;">No se encontraron reportes</h4>
-                  <p style="color: #94a3b8; font-size: 0.9em;">Intenta con otro término de búsqueda</p>
-                </div>
-              `;
-            } else {
-              reportesContainer.innerHTML = `
-                ${crearListaReportes(reportesFiltrados.notas, 'Reportes de Notas y Calificaciones', '📝', '#2563eb')}
-                ${crearListaReportes(reportesFiltrados.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
-                ${crearListaReportes(reportesFiltrados.comparativa, 'Comparativas', '📈', '#f59e0b')}
-                ${crearListaReportes(reportesFiltrados.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
-              `;
-            }
-          });
-        }
+      // Mostrar el contenedor
+      container.style.display = 'block';
 
-        // Función global para cargar reporte (se ejecuta cuando se hace click en un botón)
-        window.loadReport = async (nombreHoja) => {
-          dialog.remove();
-          showLoading('Cargando reporte...');
+      // Scroll suave hacia la lista
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-          try {
-            const response = await callBackend('leerReporteExistente', nombreHoja);
-            console.log('Respuesta de leerReporteExistente:', response);
-            hideLoading();
+      // Funcionalidad de búsqueda
+      if (totalReportes > 0) {
+        const searchInput = document.getElementById('search-reportes-dashboard');
 
-            // Aplicar el mismo unwrapping que en viewExistingReports
-            if (response && response.success) {
-              const actualData = response.result || response;
-              console.log('Datos después de unwrap:', actualData);
+        // Limpiar event listeners previos
+        const newSearchInput = searchInput.cloneNode(true);
+        searchInput.parentNode.replaceChild(newSearchInput, searchInput);
 
-              if (actualData && actualData.success) {
-                showReportResults(nombreHoja, actualData.data);
-              } else {
-                showError('Error', actualData?.message || 'No se pudo cargar el reporte');
-              }
-            } else {
-              showError('Error', response?.message || 'No se pudo cargar el reporte');
-            }
-          } catch (err) {
-            hideLoading();
-            showError('Error al cargar reporte', err.message);
+        newSearchInput.addEventListener('input', (e) => {
+          const searchTerm = e.target.value.toLowerCase().trim();
+
+          if (searchTerm === '') {
+            // Mostrar todos los reportes
+            listaDashboard.innerHTML = mensajeError + contenidoReportes;
+            badge.textContent = `${totalReportes} ${totalReportes === 1 ? 'reporte' : 'reportes'}`;
+            return;
           }
-        };
+
+          // Filtrar reportes
+          const reportesFiltrados = {
+            notas: reportesPorTipo.notas.filter(r =>
+              r.nombre.toLowerCase().includes(searchTerm) ||
+              (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm)) ||
+              (r.info.curso && r.info.curso.toLowerCase().includes(searchTerm)) ||
+              (r.info.situacion && r.info.situacion.toLowerCase().includes(searchTerm))
+            ),
+            asistencia: reportesPorTipo.asistencia.filter(r =>
+              r.nombre.toLowerCase().includes(searchTerm) ||
+              (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm)) ||
+              (r.info.fecha && r.info.fecha.toLowerCase().includes(searchTerm))
+            ),
+            comparativa: reportesPorTipo.comparativa.filter(r =>
+              r.nombre.toLowerCase().includes(searchTerm) ||
+              (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
+            ),
+            diagnostico: reportesPorTipo.diagnostico.filter(r =>
+              r.nombre.toLowerCase().includes(searchTerm) ||
+              (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
+            )
+          };
+
+          const totalFiltrados = Object.values(reportesFiltrados).reduce((sum, arr) => sum + arr.length, 0);
+          badge.textContent = `${totalFiltrados} ${totalFiltrados === 1 ? 'reporte' : 'reportes'}`;
+
+          if (totalFiltrados === 0) {
+            listaDashboard.innerHTML = `
+              <div style="text-align: center; padding: 40px 20px; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+                <div style="font-size: 3em; margin-bottom: 16px; opacity: 0.5;">🔍</div>
+                <h4 style="color: #64748b; margin-bottom: 8px; font-weight: 600;">No se encontraron reportes</h4>
+                <p style="color: #94a3b8; font-size: 0.9em;">Intenta con otro término de búsqueda</p>
+              </div>
+            `;
+          } else {
+            listaDashboard.innerHTML = `
+              ${crearListaReportes(reportesFiltrados.notas, 'Reportes de Notas y Calificaciones', '📝', '#2563eb')}
+              ${crearListaReportes(reportesFiltrados.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
+              ${crearListaReportes(reportesFiltrados.comparativa, 'Comparativas', '📈', '#f59e0b')}
+              ${crearListaReportes(reportesFiltrados.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
+            `;
+          }
+        });
+      }
+    }
+
+    // Función para ocultar la lista de reportes
+    function ocultarListaReportes() {
+      const container = document.getElementById('reportes-existentes-container');
+      container.style.display = 'none';
+
+      // Limpiar búsqueda
+      const searchInput = document.getElementById('search-reportes-dashboard');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+    }
+
+    // Función global para cargar reporte desde el Dashboard
+    window.loadReportInDashboard = async (nombreHoja) => {
+      showLoading('Cargando reporte...');
+
+      try {
+        const response = await callBackend('leerReporteExistente', nombreHoja);
+        console.log('Respuesta de leerReporteExistente:', response);
+        hideLoading();
+
+        // Aplicar el mismo unwrapping que en viewExistingReports
+        if (response && response.success) {
+          const actualData = response.result || response;
+          console.log('Datos después de unwrap:', actualData);
+
+          if (actualData && actualData.success) {
+            showReportResults(nombreHoja, actualData.data);
+          } else {
+            showError('Error', actualData?.message || 'No se pudo cargar el reporte');
+          }
+        } else {
+          showError('Error', response?.message || 'No se pudo cargar el reporte');
+        }
+      } catch (err) {
+        hideLoading();
+        showError('Error al cargar reporte', err.message);
+      }
     }
 
     async function calculateWeightedAverage() {
