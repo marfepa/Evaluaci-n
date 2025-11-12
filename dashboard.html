@@ -2924,6 +2924,7 @@
       // Agrupar reportes por tipo
       const reportesPorTipo = {
         notas: reportes.filter(r => r.tipo === 'notas'),
+        calificaciones: reportes.filter(r => r.tipo === 'calificaciones'),
         asistencia: reportes.filter(r => r.tipo === 'asistencia'),
         comparativa: reportes.filter(r => r.tipo === 'comparativa'),
         diagnostico: reportes.filter(r => r.tipo === 'diagnostico'),
@@ -2984,7 +2985,9 @@
                       ${r.subtipo ? `<span style="padding: 2px 8px; border-radius: 999px; font-size: 0.7em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; ${getBadgeStyle(r.subtipo)}">${r.subtipo.replace(/_/g, ' ')}</span>` : ''}
                     </div>
                     <div style="font-size: 0.85em; color: #64748b;">
-                      ${r.info.descripcion || (r.info.curso && r.info.situacion ? `${r.info.curso} - ${r.info.situacion}` : r.info.fecha || '')}
+                      ${r.info.curso && r.info.situacion ?
+                        `<strong>Curso:</strong> ${r.info.curso} | <strong>Situación:</strong> ${r.info.situacion}` :
+                        r.info.descripcion || r.info.fecha || ''}
                     </div>
                   </div>
                   <div style="font-size: 0.75em; color: #94a3b8; text-align: right; margin-left: 12px;">
@@ -3012,11 +3015,12 @@
       ` : '';
 
       const contenidoReportes = totalReportes > 0 ? `
-          ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas y Calificaciones', '📝', '#2563eb')}
+          ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas por Situación', '📝', '#2563eb')}
+          ${crearListaReportes(reportesPorTipo.calificaciones, 'Reportes de Calificaciones', '📊', '#8b5cf6')}
           ${crearListaReportes(reportesPorTipo.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
-          ${crearListaReportes(reportesPorTipo.comparativa, 'Comparativas', '📈', '#f59e0b')}
-          ${crearListaReportes(reportesPorTipo.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
-          ${crearListaReportes(reportesPorTipo.general, 'Otros Reportes', '📊', '#8b5cf6')}
+          ${crearListaReportes(reportesPorTipo.comparativa, 'Análisis Comparativos', '📈', '#f59e0b')}
+          ${crearListaReportes(reportesPorTipo.diagnostico, 'Diagnósticos del Sistema', '🔧', '#ef4444')}
+          ${crearListaReportes(reportesPorTipo.general, 'Otros Reportes', '📄', '#64748b')}
         ` : `
           <div style="text-align: center; padding: 40px 20px; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
             <div style="font-size: 3em; margin-bottom: 16px; opacity: 0.5;">📊</div>
@@ -3076,6 +3080,10 @@
               (r.info.curso && r.info.curso.toLowerCase().includes(searchTerm)) ||
               (r.info.situacion && r.info.situacion.toLowerCase().includes(searchTerm))
             ),
+            calificaciones: reportesPorTipo.calificaciones.filter(r =>
+              r.nombre.toLowerCase().includes(searchTerm) ||
+              (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
+            ),
             asistencia: reportesPorTipo.asistencia.filter(r =>
               r.nombre.toLowerCase().includes(searchTerm) ||
               (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm)) ||
@@ -3108,11 +3116,12 @@
             `;
           } else {
             listaDashboard.innerHTML = `
-              ${crearListaReportes(reportesFiltrados.notas, 'Reportes de Notas y Calificaciones', '📝', '#2563eb')}
+              ${crearListaReportes(reportesFiltrados.notas, 'Reportes de Notas por Situación', '📝', '#2563eb')}
+              ${crearListaReportes(reportesFiltrados.calificaciones, 'Reportes de Calificaciones', '📊', '#8b5cf6')}
               ${crearListaReportes(reportesFiltrados.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
-              ${crearListaReportes(reportesFiltrados.comparativa, 'Comparativas', '📈', '#f59e0b')}
-              ${crearListaReportes(reportesFiltrados.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
-              ${crearListaReportes(reportesFiltrados.general, 'Otros Reportes', '📊', '#8b5cf6')}
+              ${crearListaReportes(reportesFiltrados.comparativa, 'Análisis Comparativos', '📈', '#f59e0b')}
+              ${crearListaReportes(reportesFiltrados.diagnostico, 'Diagnósticos del Sistema', '🔧', '#ef4444')}
+              ${crearListaReportes(reportesFiltrados.general, 'Otros Reportes', '📄', '#64748b')}
             `;
           }
         });
