@@ -2566,16 +2566,15 @@ function listarReportesExistentes() {
         info = { descripcion: 'Diagnóstico del sistema' };
       }
 
-      // Si se identificó un tipo de reporte, agregarlo a la lista
-      if (tipo) {
-        reportes.push({
-          nombre: nombre,
-          tipo: tipo,
-          subtipo: subtipo || 'general',
-          info: info,
-          ultimaModificacion: ultimaModificacion
-        });
-      }
+      // Agregar TODAS las pestañas a la lista (sin filtro)
+      // Si no se identificó un tipo específico, usar 'general'
+      reportes.push({
+        nombre: nombre,
+        tipo: tipo || 'general',
+        subtipo: subtipo || 'general',
+        info: info.descripcion ? info : { descripcion: nombre },
+        ultimaModificacion: ultimaModificacion
+      });
     });
 
     Logger.log('Total de reportes identificados: ' + reportes.length);

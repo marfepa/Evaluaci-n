@@ -2892,7 +2892,8 @@
         notas: reportes.filter(r => r.tipo === 'notas'),
         asistencia: reportes.filter(r => r.tipo === 'asistencia'),
         comparativa: reportes.filter(r => r.tipo === 'comparativa'),
-        diagnostico: reportes.filter(r => r.tipo === 'diagnostico')
+        diagnostico: reportes.filter(r => r.tipo === 'diagnostico'),
+        general: reportes.filter(r => r.tipo === 'general')
       };
 
       const formatFecha = (fecha) => {
@@ -2981,6 +2982,7 @@
           ${crearListaReportes(reportesPorTipo.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
           ${crearListaReportes(reportesPorTipo.comparativa, 'Comparativas', '📈', '#f59e0b')}
           ${crearListaReportes(reportesPorTipo.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
+          ${crearListaReportes(reportesPorTipo.general, 'Otros Reportes', '📊', '#8b5cf6')}
         ` : `
           <div style="text-align: center; padding: 40px 20px; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
             <div style="font-size: 3em; margin-bottom: 16px; opacity: 0.5;">📊</div>
@@ -3052,6 +3054,10 @@
             diagnostico: reportesPorTipo.diagnostico.filter(r =>
               r.nombre.toLowerCase().includes(searchTerm) ||
               (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
+            ),
+            general: reportesPorTipo.general.filter(r =>
+              r.nombre.toLowerCase().includes(searchTerm) ||
+              (r.info.descripcion && r.info.descripcion.toLowerCase().includes(searchTerm))
             )
           };
 
@@ -3072,6 +3078,7 @@
               ${crearListaReportes(reportesFiltrados.asistencia, 'Reportes de Asistencia', '📋', '#10b981')}
               ${crearListaReportes(reportesFiltrados.comparativa, 'Comparativas', '📈', '#f59e0b')}
               ${crearListaReportes(reportesFiltrados.diagnostico, 'Diagnósticos', '🔧', '#ef4444')}
+              ${crearListaReportes(reportesFiltrados.general, 'Otros Reportes', '📊', '#8b5cf6')}
             `;
           }
         });
