@@ -2855,21 +2855,14 @@
         let actualData = null;
         let arrayReportes = null;
 
-        // Estrategia 1: Web App mode - response.result contiene el resultado
-        if (response && response.success && response.result) {
-          console.log('✅ Estrategia 1: Web App mode (response.result)');
-          actualData = response.result;
-        }
-        // Estrategia 2: Modal mode - response es directamente el resultado
-        else if (response && response.success !== undefined) {
-          console.log('✅ Estrategia 2: Modal mode (response directo)');
-          actualData = response;
-        }
-        // Estrategia 3: Response es el resultado sin envolver
-        else {
-          console.log('⚠️ Estrategia 3: Response sin estructura conocida');
-          actualData = response;
-        }
+        // callBackend ya devuelve el resultado desenvuelto en ambos modos
+        // Tanto Modal como Web App retornan: {success: true/false, data: [], message?: string}
+        console.log('📦 Respuesta recibida:', response);
+        console.log('📦 Tipo:', typeof response);
+        console.log('📦 success:', response?.success);
+        console.log('📦 data:', response?.data);
+
+        actualData = response;
 
         console.log('🔍 actualData:', actualData);
         console.log('🔍 actualData.success:', actualData?.success);
@@ -3323,21 +3316,15 @@
         console.log('Respuesta de listarReportesExistentes en exportData:', response);
         hideLoading();
 
-        // Aplicar el mismo unwrapping
+        // callBackend ya devuelve el resultado desenvuelto
+        console.log('Respuesta en exportData:', response);
+
         if (!response || !response.success) {
           showError('Error', response?.message || 'No se pudo obtener la lista de reportes');
           return;
         }
 
-        const actualData = response.result || response;
-        console.log('Datos después de unwrap en exportData:', actualData);
-
-        if (!actualData || !actualData.success) {
-          showError('Error', actualData?.message || 'No se pudo obtener la lista de reportes');
-          return;
-        }
-
-        const reportes = actualData.data || [];
+        const reportes = response.data || [];
 
         if (reportes.length === 0) {
           showError('Sin reportes', 'No hay reportes generados todavía. Primero genera un reporte para poder exportarlo.');
