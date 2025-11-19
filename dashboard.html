@@ -4564,7 +4564,7 @@
 
         // Load existing evaluation if only one student is selected
         if (evaluationData.selectedStudents.length === 1) {
-          showLoading('Verificando evaluación existente...');
+          showLoading('Buscando evaluación previa...'); // Feedback visual
           try {
             const existingEval = await callBackend('getStudentEvaluation',
               evaluationData.selectedStudents[0].id,
@@ -4573,22 +4573,31 @@
             hideLoading();
 
             if (existingEval) {
-              console.log('📝 Cargando evaluación existente:', existingEval);
               evaluationData.existingEvaluationId = existingEval.id;
-              loadExistingEvaluation(existingEval);
-
-              // Mostrar mensaje informativo
-              const panelBody = document.querySelector('#evaluationPanel .panel-body');
-              const infoDiv = document.createElement('div');
-              infoDiv.style.cssText = 'padding: 0.75rem; background: rgba(251, 191, 36, 0.1); border-left: 4px solid #fbbf24; border-radius: 4px; margin-bottom: 1rem; font-size: 0.875rem;';
-              infoDiv.innerHTML = '⚠️ <strong>Evaluación existente:</strong> Estás revisando una evaluación guardada. Los cambios sobrescribirán la evaluación anterior.';
-              panelBody.insertBefore(infoDiv, panelBody.firstChild);
+              loadExistingEvaluation(existingEval); // <--- Llama a la función mejorada del Paso 2
             } else {
+              // Resetear si no hay evaluación
               evaluationData.existingEvaluationId = null;
+
+              // Limpiar formulario (opcional)
+              const form = document.getElementById('evaluationForm');
+              if (form) {
+                form.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(i => i.checked = false);
+              }
+
+              const notesField = document.getElementById('evaluationNotes');
+              if(notesField) notesField.value = '';
+
+              // Restaurar color header normal
+              const header = document.querySelector('.evaluation-panel-header');
+              if (header) header.style.background = '';
+
+              const saveBtn = document.getElementById('saveEvaluationBtn');
+              if (saveBtn) saveBtn.innerText = '💾 Guardar Evaluación';
             }
           } catch (error) {
             hideLoading();
-            console.log('No hay evaluación existente o error al cargarla:', error);
+            console.log('Error checking evaluation:', error);
             evaluationData.existingEvaluationId = null;
           }
         }
@@ -4757,96 +4766,136 @@
      * Load existing evaluation into form
      */
     /**
-     * Carga una evaluación existente en el formulario (Visualizar/Editar)
+     * Carga datos existentes en el formulario visual (Versión Robusta con Fuzzy Matching)
      */
     function loadExistingEvaluation(evaluation) {
-      const instrument = evaluationData.instrumentDetails;
+      if (!evaluation || !evaluation.resultado) return;
+
       const resultado = evaluation.resultado;
+      const instrument = evaluationData.instrumentDetails;
 
-      console.log('📥 Datos recibidos:', resultado);
+      console.log('📝 Visualizando datos guardados:', resultado);
 
-      // 1. Cargar Comentarios
-      const notesField = document.getElementById('evaluationNotes');
-      if (notesField) notesField.value = evaluation.notes || '';
-
-      // 2. Cargar Calificación Directa
+      // 1. Cargar Comentarios y Notas
+      if (document.getElementById('evaluationNotes')) {
+        document.getElementById('evaluationNotes').value = evaluation.notes || '';
+      }
       if (document.getElementById('directGrade') && resultado.calificacion) {
         document.getElementById('directGrade').value = resultado.calificacion;
       }
 
-      // 3. Cargar Rúbricas (Lógica de limpieza de texto)
+      // ==========================================
+      // LÓGICA PARA RÚBRICAS (Fuzzy Matching)
+      // ==========================================
       if (instrument.tipo === 'Rúbrica' && resultado.criterios) {
 
+        // Obtener todos los bloques de criterios del HTML
         const domCriterios = document.querySelectorAll('.evaluation-criterion');
 
-        // Recorremos los criterios guardados en BD
         resultado.criterios.forEach(savedCrit => {
+          // Normalizar nombre guardado: "Technical Correctness" -> "technicalcorrectness"
+          const cleanSavedName = String(savedCrit.criterio)
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ''); // Solo letras y números
 
-          // Buscamos el bloque HTML correspondiente
-          // Normalizamos quitando números iniciales "1. ", espacios y mayúsculas
-          const cleanSavedCritName = String(savedCrit.criterio).replace(/^\d+\.?\s*/, '').trim().toLowerCase();
-
+          // Buscar el bloque HTML correspondiente
           let targetBlock = null;
-          domCriterios.forEach(block => {
-            const title = block.querySelector('.evaluation-criterion-title').innerText;
-            const cleanTitle = title.replace(/^\d+\.?\s*/, '').trim().toLowerCase();
-            if (cleanTitle === cleanSavedCritName) targetBlock = block;
-          });
+
+          for (const block of domCriterios) {
+            const titleEl = block.querySelector('.evaluation-criterion-title');
+            if (!titleEl) continue;
+
+            // Normalizar título HTML: "1. Technical Correctness" -> "technicalcorrectness"
+            const cleanTitle = titleEl.innerText
+              .toLowerCase()
+              .replace(/^\d+[\.\)]\s*/, '') // Quitar "1. " inicial
+              .replace(/[^a-z0-9]/g, '');
+
+            // Coincidencia aproximada
+            if (cleanTitle.includes(cleanSavedName) || cleanSavedName.includes(cleanTitle)) {
+              targetBlock = block;
+              break;
+            }
+          }
 
           if (targetBlock) {
-            // Encontramos el bloque, ahora buscamos el nivel (Radio Button)
-            // Comparamos el savedLevel contra value, data-nombre y el texto del label
-            const cleanSavedLevel = String(savedCrit.nivel).trim().toLowerCase();
+            // Encontramos el criterio, ahora buscamos el nivel (Radio Button)
+            const savedLevel = String(savedCrit.nivel).trim().toLowerCase();
             const radios = targetBlock.querySelectorAll('input[type="radio"]');
 
+            let matchFound = false;
             radios.forEach(radio => {
+              // Comparar contra Value, Data-Nombre o el Label asociado
               const val = String(radio.value).trim().toLowerCase();
               const name = String(radio.dataset.nombre || '').trim().toLowerCase();
 
-              // Comparación flexible
-              if (val === cleanSavedLevel || name === cleanSavedLevel) {
+              // Si coincide valor ("competent" == "competent")
+              if (val === savedLevel || name === savedLevel) {
                 radio.checked = true;
-                // Disparar evento change por si hay lógica visual asociada
-                radio.dispatchEvent(new Event('change'));
+                matchFound = true;
               }
             });
+
+            // Si no encontró por valor, buscar por texto en el Label visible
+            if (!matchFound) {
+               const labels = targetBlock.querySelectorAll('label');
+               labels.forEach(lbl => {
+                 if (lbl.innerText.toLowerCase().includes(savedLevel)) {
+                   const id = lbl.getAttribute('for');
+                   const radio = document.getElementById(id);
+                   if (radio) radio.checked = true;
+                 }
+               });
+            }
           }
         });
       }
 
-      // 4. Cargar Lista de Cotejo
+      // ==========================================
+      // LÓGICA PARA LISTAS DE COTEJO
+      // ==========================================
       else if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
-         const domItems = document.querySelectorAll('.evaluation-criterion'); // En lista cotejo cada item es una 'fila'
-
+         // Lógica similar simplificada para items
+         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
          resultado.items.forEach(savedItem => {
-           const cleanSavedText = String(savedItem.item).trim().toLowerCase();
+           if (!savedItem.completado) return;
+           const cleanItem = String(savedItem.item).toLowerCase().replace(/[^a-z0-9]/g, '');
 
-           domItems.forEach(block => {
-             const labelSpan = block.querySelector('span');
-             if(labelSpan) {
-               const cleanLabel = labelSpan.textContent.trim().toLowerCase();
-               if (cleanLabel === cleanSavedText) {
-                 const checkbox = block.querySelector('input[type="checkbox"]');
-                 if (checkbox) {
-                   checkbox.checked = savedItem.completado;
-                 }
-               }
+           checkboxes.forEach(cb => {
+             // Buscar el texto en el span hermano
+             const span = cb.parentElement.querySelector('span');
+             if (span) {
+               const cleanLabel = span.innerText.toLowerCase().replace(/[^a-z0-9]/g, '');
+               if (cleanLabel.includes(cleanItem)) cb.checked = true;
              }
            });
          });
       }
 
-      // Feedback visual
-      const panel = document.querySelector('.evaluation-panel-content');
-      // Eliminar alertas previas si existen
-      const oldAlert = panel.querySelector('.alert-mode-info');
-      if(oldAlert) oldAlert.remove();
+      // Feedback visual para el usuario
+      const header = document.querySelector('.evaluation-panel-header');
+      if (header) {
+        header.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'; // Color naranja para indicar modo revisión
+      }
 
-      const msg = document.createElement('div');
-      msg.className = 'alert alert-info alert-mode-info';
-      msg.style.cssText = 'margin-bottom: 1rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0ea5e9; color: #0369a1;';
-      msg.innerHTML = `<strong>Modo Revisión:</strong> Visualizando evaluación del ${new Date(evaluation.fecha).toLocaleDateString()}`;
-      panel.insertBefore(msg, panel.firstChild);
+      const saveBtn = document.getElementById('saveEvaluationBtn');
+      if (saveBtn) {
+        saveBtn.innerText = '💾 Actualizar Evaluación';
+      }
+
+      // Mensaje informativo mejorado
+      const panel = document.querySelector('.evaluation-panel-content');
+      if (panel) {
+        // Eliminar alertas previas si existen
+        const oldAlert = panel.querySelector('.alert-mode-info');
+        if(oldAlert) oldAlert.remove();
+
+        const msg = document.createElement('div');
+        msg.className = 'alert alert-info alert-mode-info';
+        msg.style.cssText = 'margin-bottom: 1rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; color: #92400e; border-radius: 4px;';
+        msg.innerHTML = `<strong>✏️ Modo Edición:</strong> Visualizando evaluación del ${new Date(evaluation.fecha).toLocaleDateString()}. Los cambios sobrescribirán la evaluación anterior.`;
+        panel.insertBefore(msg, panel.firstChild);
+      }
     }
 
     /**
