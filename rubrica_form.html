@@ -224,6 +224,11 @@
           fb.style.display = 'none';
 
           if (result.success && result.data) {
+            // Primero limpiar todas las selecciones previas
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+              radio.checked = false;
+            });
+
             // Marcar los radio buttons correspondientes
             Object.keys(result.data.criterios).forEach(criterioId => {
               const nivelId = result.data.criterios[criterioId];
@@ -231,9 +236,6 @@
               const radio = document.getElementById(radioId);
               if (radio) {
                 radio.checked = true;
-                // Aplicar estilo visual
-                radio.parentElement.querySelector('.radio-label').style.background = 'linear-gradient(135deg, #28a745, #20c997)';
-                radio.parentElement.querySelector('.radio-label').style.color = '#fff';
               }
             });
 
@@ -251,12 +253,6 @@
             // No hay evaluación previa, limpiar formulario
             document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
               radio.checked = false;
-              // Limpiar estilos
-              const label = radio.parentElement.querySelector('.radio-label');
-              if (label) {
-                label.style.background = '';
-                label.style.color = '';
-              }
             });
             document.getElementById('comments').value = '';
           }
