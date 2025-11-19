@@ -4535,6 +4535,37 @@
         // Generate evaluation form
         generateEvaluationForm();
 
+        // Load existing evaluation if only one student is selected
+        if (evaluationData.selectedStudents.length === 1) {
+          showLoading('Verificando evaluación existente...');
+          try {
+            const existingEval = await callBackend('getStudentEvaluation',
+              evaluationData.selectedStudents[0].id,
+              evaluationData.instrumentDetails.id
+            );
+            hideLoading();
+
+            if (existingEval) {
+              console.log('📝 Cargando evaluación existente:', existingEval);
+              evaluationData.existingEvaluationId = existingEval.id;
+              loadExistingEvaluation(existingEval);
+
+              // Mostrar mensaje informativo
+              const panelBody = document.querySelector('#evaluationPanel .panel-body');
+              const infoDiv = document.createElement('div');
+              infoDiv.style.cssText = 'padding: 0.75rem; background: rgba(251, 191, 36, 0.1); border-left: 4px solid #fbbf24; border-radius: 4px; margin-bottom: 1rem; font-size: 0.875rem;';
+              infoDiv.innerHTML = '⚠️ <strong>Evaluación existente:</strong> Estás revisando una evaluación guardada. Los cambios sobrescribirán la evaluación anterior.';
+              panelBody.insertBefore(infoDiv, panelBody.firstChild);
+            } else {
+              evaluationData.existingEvaluationId = null;
+            }
+          } catch (error) {
+            hideLoading();
+            console.log('No hay evaluación existente o error al cargarla:', error);
+            evaluationData.existingEvaluationId = null;
+          }
+        }
+
         // Show panel
         document.getElementById('evaluationPanel').classList.add('active');
         document.getElementById('evaluationPanelOverlay').classList.add('active');
@@ -4554,6 +4585,9 @@
       document.getElementById('evaluationPanel').classList.remove('active');
       document.getElementById('evaluationPanelOverlay').classList.remove('active');
       document.body.style.overflow = '';
+
+      // Clear existing evaluation ID
+      evaluationData.existingEvaluationId = null;
     }
 
     /**
@@ -4693,6 +4727,57 @@
     }
 
     /**
+     * Load existing evaluation into form
+     */
+    function loadExistingEvaluation(evaluation) {
+      const instrument = evaluationData.instrumentDetails;
+      const resultado = evaluation.resultado;
+
+      console.log('📝 Pre-llenando formulario con evaluación existente');
+
+      // Load notes
+      const notesField = document.getElementById('evaluationNotes');
+      if (notesField && evaluation.notes) {
+        notesField.value = evaluation.notes;
+      }
+
+      // Load evaluation data based on instrument type
+      if (instrument.tipo === 'Rúbrica' && resultado.criterios) {
+        resultado.criterios.forEach((crit, index) => {
+          const radio = document.querySelector(`input[name="criterio_${index}"][value="${crit.nivel}"]`);
+          if (radio) {
+            radio.checked = true;
+          } else {
+            // Try to find by nivel name
+            const radios = document.querySelectorAll(`input[name="criterio_${index}"]`);
+            radios.forEach(r => {
+              if (r.dataset.nombre === crit.nivelNombre || r.dataset.nombre === crit.nivel) {
+                r.checked = true;
+              }
+            });
+          }
+        });
+        console.log(`   ✓ Cargados ${resultado.criterios.length} criterios`);
+
+      } else if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
+        resultado.items.forEach((item, index) => {
+          const checkbox = document.getElementById(`item_${index}`);
+          if (checkbox) {
+            checkbox.checked = item.completado;
+          }
+        });
+        console.log(`   ✓ Cargados ${resultado.items.length} items`);
+
+      } else if (instrument.tipo === 'Calificación Directa' && resultado.calificacion !== undefined) {
+        const gradeInput = document.getElementById('directGrade');
+        if (gradeInput) {
+          gradeInput.value = resultado.calificacion;
+        }
+        console.log(`   ✓ Cargada calificación: ${resultado.calificacion}`);
+      }
+    }
+
+    /**
      * Save evaluation
      */
     async function saveEvaluation() {
@@ -4719,6 +4804,16 @@
 
         // Save evaluation for each selected student
         for (const student of evaluationData.selectedStudents) {
+          // If updating existing evaluation, delete it first
+          if (evaluationData.existingEvaluationId && evaluationData.selectedStudents.length === 1) {
+            try {
+              await callBackend('deleteExistingEvaluation', student.id, instrument.id);
+              console.log('✓ Evaluación existente eliminada');
+            } catch (error) {
+              console.error('Error eliminando evaluación existente:', error);
+            }
+          }
+
           const dataToSave = {
             studentId: student.id,
             studentName: student.nombre,
@@ -4755,6 +4850,7 @@
       const criteria = evaluationData.instrumentDetails.criterios || [];
       const results = [];
       let totalPoints = 0;
+      let maxPossiblePoints = 0;
 
       console.log('📊 Recopilando datos de rúbrica');
 
@@ -4767,6 +4863,11 @@
 
         const points = parseFloat(selected.dataset.puntos);
         totalPoints += points;
+
+        // Calcular el máximo de puntos posibles para este criterio
+        const niveles = criteria[i].niveles || [];
+        const maxPoints = Math.max(...niveles.map(n => parseFloat(n.puntos) || 0));
+        maxPossiblePoints += maxPoints;
 
         const resultItem = {
           criterio: criteria[i].nombre,
@@ -4781,12 +4882,16 @@
         results.push(resultItem);
       }
 
-      console.log(`   Total: ${totalPoints} puntos`);
+      // Convertir a escala de 10
+      const calificacion = maxPossiblePoints > 0 ? (totalPoints / maxPossiblePoints) * 10 : 0;
+
+      console.log(`   Total: ${totalPoints}/${maxPossiblePoints} puntos → Calificación: ${calificacion.toFixed(2)}/10`);
 
       return {
         criterios: results,
         puntosTotales: totalPoints,
-        calificacion: totalPoints
+        maxPuntos: maxPossiblePoints,
+        calificacion: parseFloat(calificacion.toFixed(2))
       };
     }
 
@@ -4808,11 +4913,16 @@
         });
       });
 
+      // Calcular calificación sobre 10
+      const porcentaje = items.length > 0 ? (completedCount / items.length * 100) : 0;
+      const calificacion = porcentaje / 10; // Convertir porcentaje a escala de 10
+
       return {
         items: results,
         completados: completedCount,
         total: items.length,
-        porcentaje: (completedCount / items.length * 100).toFixed(2)
+        porcentaje: porcentaje.toFixed(2),
+        calificacion: parseFloat(calificacion.toFixed(2))
       };
     }
 
@@ -5014,7 +5124,8 @@
                 </div>
               `).join('')}
               <div style="padding: 1rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-top: 1rem; text-align: center;">
-                <strong style="font-size: 1.1rem; color: var(--primary);">Calificación Total: ${evaluation.resultado.calificacion || evaluation.resultado.puntosTotales} puntos</strong>
+                <strong style="font-size: 1.1rem; color: var(--primary);">Calificación Total: ${evaluation.resultado.calificacion}/10</strong>
+                <div style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.5rem;">${evaluation.resultado.puntosTotales}/${evaluation.resultado.maxPuntos} puntos</div>
               </div>
             </div>
           `;
@@ -5030,9 +5141,10 @@
                 </div>
               `).join('')}
               <div style="padding: 1rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-top: 1rem; text-align: center;">
-                <strong style="font-size: 1.1rem; color: var(--primary);">
+                <strong style="font-size: 1.1rem; color: var(--primary);">Calificación: ${evaluation.resultado.calificacion}/10</strong>
+                <div style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.5rem;">
                   ${evaluation.resultado.completados} de ${evaluation.resultado.total} completados (${evaluation.resultado.porcentaje}%)
-                </strong>
+                </div>
               </div>
             </div>
           `;
