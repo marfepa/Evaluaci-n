@@ -4339,7 +4339,7 @@
                         data-student-id="${student.id}">
                   👁️ Ver
                 </button>
-                <button class="btn btn-outline btn-select-student"
+                <button class="btn btn-outline btn-edit-student"
                         style="padding: 0.5rem 0.75rem; font-size: 0.875rem;"
                         data-student-id="${student.id}">
                   ✏️ Revisar
@@ -4362,6 +4362,12 @@
       document.querySelectorAll('.btn-view-eval').forEach(btn => {
         btn.addEventListener('click', () => {
           viewStudentEvaluation(btn.dataset.studentId);
+        });
+      });
+
+      document.querySelectorAll('.btn-edit-student').forEach(btn => {
+        btn.addEventListener('click', () => {
+          editStudentEvaluation(btn.dataset.studentId);
         });
       });
 
@@ -4485,6 +4491,22 @@
 
       // Open evaluation panel
       openEvaluationPanel();
+    }
+
+    /**
+     * Abre el panel de evaluación en modo edición para un estudiante específico
+     */
+    function editStudentEvaluation(studentId) {
+      // 1. Encontrar el objeto estudiante
+      const student = evaluationData.allStudents.find(s => s.id === studentId);
+      if (!student) return;
+
+      // 2. Seleccionarlo como único estudiante (lógica existente)
+      selectSingleStudent(student);
+
+      // 3. Forzar la apertura del panel (selectSingleStudent ya lo hace, pero aseguramos)
+      // La lógica dentro de openEvaluationPanel detectará si es un solo estudiante
+      // y llamará automáticamente a getStudentEvaluation -> loadExistingEvaluation
     }
 
     /**
@@ -4729,51 +4751,86 @@
     /**
      * Load existing evaluation into form
      */
+    /**
+     * Carga una evaluación existente en el formulario (Visualizar/Editar)
+     */
     function loadExistingEvaluation(evaluation) {
       const instrument = evaluationData.instrumentDetails;
       const resultado = evaluation.resultado;
 
-      console.log('📝 Pre-llenando formulario con evaluación existente');
+      console.log('📝 Pre-llenando formulario con datos recuperados:', resultado);
 
-      // Load notes
+      // Cargar notas/comentarios
       const notesField = document.getElementById('evaluationNotes');
       if (notesField && evaluation.notes) {
         notesField.value = evaluation.notes;
       }
 
-      // Load evaluation data based on instrument type
+      // === LÓGICA PARA RÚBRICAS ===
       if (instrument.tipo === 'Rúbrica' && resultado.criterios) {
-        resultado.criterios.forEach((crit, index) => {
-          const radio = document.querySelector(`input[name="criterio_${index}"][value="${crit.nivel}"]`);
-          if (radio) {
-            radio.checked = true;
-          } else {
-            // Try to find by nivel name
-            const radios = document.querySelectorAll(`input[name="criterio_${index}"]`);
-            radios.forEach(r => {
-              if (r.dataset.nombre === crit.nivelNombre || r.dataset.nombre === crit.nivel) {
-                r.checked = true;
+        // Iterar sobre los criterios GUARDADOS en la hoja de cálculo
+        resultado.criterios.forEach(critGuardado => {
+
+          // 1. Buscar en el DOM el bloque del criterio que coincida con el nombre
+          // Buscamos todos los títulos de criterios en el formulario generado
+          const domCriterios = document.querySelectorAll('.evaluation-criterion');
+
+          domCriterios.forEach((domCritDiv, index) => {
+            const titleDiv = domCritDiv.querySelector('.evaluation-criterion-title');
+            // Limpiamos el texto (ej: "1. Defensive Role" -> "Defensive Role") para comparar
+            const domCritText = titleDiv.textContent.replace(/^\d+\.\s*/, '').trim();
+
+            if (domCritText === critGuardado.criterio) {
+              // ¡Encontramos el criterio! Ahora buscamos el radio button del nivel
+
+              // Intentamos encontrar el input que tenga el valor exacto (ej: "Competent")
+              // O cuyo data-nombre coincida
+              const radios = domCritDiv.querySelectorAll('input[type="radio"]');
+              let matchFound = false;
+
+              radios.forEach(radio => {
+                const nivelNombre = radio.dataset.nombre || '';
+                const nivelValor = radio.value;
+
+                // Comparamos con lo guardado (critGuardado.nivel)
+                if (nivelValor === critGuardado.nivel || nivelNombre === critGuardado.nivel) {
+                  radio.checked = true;
+                  matchFound = true;
+                }
+              });
+
+              if (!matchFound) {
+                console.warn(`No se encontró coincidencia de nivel para: ${critGuardado.criterio} -> ${critGuardado.nivel}`);
               }
-            });
-          }
+            }
+          });
         });
-        console.log(`   ✓ Cargados ${resultado.criterios.length} criterios`);
+        console.log(`   ✓ Rúbrica cargada: ${resultado.criterios.length} criterios mapeados`);
 
+      // === LÓGICA PARA LISTAS DE COTEJO ===
       } else if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
-        resultado.items.forEach((item, index) => {
-          const checkbox = document.getElementById(`item_${index}`);
-          if (checkbox) {
-            checkbox.checked = item.completado;
-          }
-        });
-        console.log(`   ✓ Cargados ${resultado.items.length} items`);
+        // Mapeo por texto del ítem
+        const domItems = document.querySelectorAll('.evaluation-criterion span'); // Span contiene el texto
 
+        resultado.items.forEach(itemGuardado => {
+          domItems.forEach(span => {
+            if (span.textContent.trim() === itemGuardado.item) {
+              // Encontrar el checkbox hermano anterior
+              const checkbox = span.parentElement.querySelector('input[type="checkbox"]');
+              if (checkbox) {
+                checkbox.checked = itemGuardado.completado;
+              }
+            }
+          });
+        });
+        console.log(`   ✓ Lista de Cotejo cargada`);
+
+      // === LÓGICA PARA CALIFICACIÓN DIRECTA ===
       } else if (instrument.tipo === 'Calificación Directa' && resultado.calificacion !== undefined) {
         const gradeInput = document.getElementById('directGrade');
         if (gradeInput) {
           gradeInput.value = resultado.calificacion;
         }
-        console.log(`   ✓ Cargada calificación: ${resultado.calificacion}`);
       }
     }
 

@@ -4801,69 +4801,115 @@ function getEvaluationsByInstrument(instrumentId) {
 
 /**
  * Get student evaluation for a specific instrument
+ * Obtiene la evaluación detallada de un estudiante reconstruyéndola desde CalificacionesDetalladas
  */
 function getStudentEvaluation(studentId, instrumentId) {
   try {
     Logger.log(`[getStudentEvaluation] Buscando evaluación: estudiante=${studentId}, instrumento=${instrumentId}`);
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let evalSheet = ss.getSheetByName('Evaluaciones');
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const detSheet = ss.getSheetByName('CalificacionesDetalladas');
 
-    if (!evalSheet) {
-      Logger.log('[getStudentEvaluation] No existe la hoja Evaluaciones');
+    if (!detSheet) {
+      Logger.log('[getStudentEvaluation] No existe la hoja CalificacionesDetalladas');
       return null;
     }
 
-    const data = evalSheet.getDataRange().getValues();
+    // Obtener datos crudos
+    const data = detSheet.getDataRange().getValues();
     const headers = data[0];
 
-    // Find column indices
-    const idCol = headers.indexOf('ID');
-    const fechaCol = headers.indexOf('Fecha');
-    const studentIdCol = headers.indexOf('Estudiante ID');
-    const studentCol = headers.indexOf('Estudiante');
-    const courseCol = headers.indexOf('Curso');
-    const instrumentIdCol = headers.indexOf('Instrumento ID');
-    const instrumentCol = headers.indexOf('Instrumento');
-    const tipoCol = headers.indexOf('Tipo');
-    const resultadoCol = headers.indexOf('Resultado');
-    const notasCol = headers.indexOf('Notas');
+    // Mapear índices de columnas clave basados en la estructura de CalificacionesDetalladas
+    const iEstId = headers.indexOf('IDEstudiante');
+    const iEstNombre = headers.indexOf('NombreEstudiante');
+    const iInst = headers.indexOf('NombreInstrumento');
+    const iInstId = headers.indexOf('IDInstrumento');
 
-    // Find the evaluation
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
+    // Columnas de Rúbrica
+    const iCrit = headers.indexOf('NombreCriterioEvaluado');
+    const iNivel = headers.indexOf('NombreNivelAlcanzado');
+    const iPuntos = headers.indexOf('PuntuacionCriterio');
 
-      // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
-      if (String(row[studentIdCol]) === String(studentId) && String(row[instrumentIdCol]) === String(instrumentId)) {
-        // Parse the resultado JSON
-        let resultado;
-        try {
-          resultado = JSON.parse(row[resultadoCol]);
-        } catch (e) {
-          Logger.log(`[getStudentEvaluation] Error parseando resultado: ${e.message}`);
-          resultado = row[resultadoCol];
-        }
+    // Columnas de Lista de Cotejo / Otros
+    const iItem = headers.indexOf('DescripcionItemEvaluado');
+    const iCompletado = headers.indexOf('CompletadoItem');
+    const iCalifTotal = headers.indexOf('CalificacionTotalInstrumento');
+    const iNotas = headers.indexOf('ComentariosGenerales') > -1 ? headers.indexOf('ComentariosGenerales') : headers.indexOf('ComentariosGlobales');
+    const iFecha = headers.indexOf('FechaEvaluacion');
+    const iIdCalif = headers.indexOf('IDCalificacionMaestra');
 
-        const evaluation = {
-          id: row[idCol],
-          fecha: row[fechaCol],
-          studentId: row[studentIdCol],
-          studentName: row[studentCol],
-          course: row[courseCol],
-          instrumentId: row[instrumentIdCol],
-          instrumentName: row[instrumentCol],
-          tipo: row[tipoCol],
-          resultado: resultado,
-          notes: row[notasCol]
-        };
+    // Obtener info del instrumento y estudiante para filtrar
+    const estudianteObj = getEstudiantes(ss).find(e => String(e.IDEstudiante) === String(studentId));
+    const instrumentoObj = getInstrumentoById(ss, instrumentId);
 
-        Logger.log(`[getStudentEvaluation] Evaluación encontrada`);
-        return evaluation;
-      }
+    if (!estudianteObj || !instrumentoObj) {
+      Logger.log('[getStudentEvaluation] No se encontró estudiante o instrumento');
+      return null;
     }
 
-    Logger.log(`[getStudentEvaluation] No se encontró evaluación`);
-    return null;
+    const nombreEstudianteTarget = estudianteObj.NombreEstudiante;
+    const nombreInstrumentoTarget = instrumentoObj.NombreInstrumento;
+
+    // Filtrar filas correspondientes
+    const filas = data.filter((r, i) => i > 0 &&
+      r[iInst] === nombreInstrumentoTarget &&
+      (String(r[iEstId]) === String(studentId) || r[iEstNombre] === nombreEstudianteTarget)
+    );
+
+    if (filas.length === 0) {
+      Logger.log('[getStudentEvaluation] No se encontró evaluación');
+      return null;
+    }
+
+    // Reconstruir objeto de resultado
+    const resultado = {
+      criterios: [],
+      items: [],
+      calificacion: 0,
+      puntosTotales: 0
+    };
+
+    let notasGuardadas = "";
+    let fechaGuardada = null;
+    let idCalificacion = null;
+
+    filas.forEach(r => {
+      // Capturar fecha, notas e ID de la primera fila encontrada
+      if (!fechaGuardada && iFecha > -1) fechaGuardada = r[iFecha];
+      if (!notasGuardadas && iNotas > -1) notasGuardadas = r[iNotas];
+      if (!idCalificacion && iIdCalif > -1) idCalificacion = r[iIdCalif];
+
+      // Si es Rúbrica (tiene criterio y nivel)
+      if (r[iCrit] && r[iNivel]) {
+        resultado.criterios.push({
+          criterio: r[iCrit],
+          nivel: r[iNivel],
+          puntos: r[iPuntos]
+        });
+      }
+
+      // Si es Lista de Cotejo
+      if (r[iItem]) {
+        resultado.items.push({
+          item: r[iItem],
+          completado: r[iCompletado] === 'Sí' || r[iCompletado] === true
+        });
+      }
+
+      // Calificación total (sobrescribe, asumimos que es igual en todas las filas del lote)
+      if (r[iCalifTotal]) resultado.calificacion = parseFloat(r[iCalifTotal]);
+    });
+
+    Logger.log('[getStudentEvaluation] Evaluación encontrada y reconstruida desde CalificacionesDetalladas');
+
+    return {
+      id: idCalificacion || `${studentId}_${instrumentId}`,
+      studentId: studentId,
+      instrumentId: instrumentId,
+      fecha: fechaGuardada,
+      resultado: resultado,
+      notes: notasGuardadas
+    };
 
   } catch (error) {
     Logger.log(`[getStudentEvaluation] Error: ${error.message}`);
