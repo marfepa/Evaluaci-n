@@ -4793,87 +4793,89 @@ function getEvaluationsByInstrument(instrumentId) {
 }
 
 /**
- * ✅ OPTIMIZADO: Reconstruye la evaluación leyendo fila por fila de CalificacionesDetalladas
- */
-/**
- * ✅ VERSION DEFINITIVA: Recupera los datos exactos para rellenar el formulario
+ * ✅ SOLUCIÓN ROBUSTA: Recupera la evaluación directamente de los datos guardados
+ * Implementa fuzzy matching para garantizar compatibilidad con variaciones de texto
  */
 function getStudentEvaluation(studentId, instrumentId) {
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
 
-    // Índices
-    const iInst = headers.indexOf('NombreInstrumento');
-    const iEst = headers.indexOf('NombreEstudiante');
-    const iCrit = headers.indexOf('NombreCriterioEvaluado');
-    const iNivel = headers.indexOf('NombreNivelAlcanzado');
-    const iPunt = headers.indexOf('PuntuacionCriterio');
-    const iNota = headers.indexOf('CalificacionTotalInstrumento');
-    const iCom = headers.indexOf('ComentariosGenerales');
-    // Soporte para ítems de lista de cotejo
-    const iItemDesc = headers.indexOf('DescripcionItemEvaluado');
-    const iItemComp = headers.indexOf('CompletadoItem');
+    // Mapeo de columnas clave (ajustado a la estructura de CalificacionesDetalladas)
+    const col = {
+      inst: headers.indexOf('NombreInstrumento'),
+      estNombre: headers.indexOf('NombreEstudiante'),
+      estId: headers.indexOf('IDEstudiante'), // Por si acaso
+      crit: headers.indexOf('NombreCriterioEvaluado'),
+      nivel: headers.indexOf('NombreNivelAlcanzado'),
+      puntos: headers.indexOf('PuntuacionCriterio'),
+      nota: headers.indexOf('CalificacionTotalInstrumento'),
+      coments: headers.indexOf('ComentariosGenerales'),
+      fecha: headers.indexOf('FechaEvaluacion'),
+      // Para listas de cotejo
+      item: headers.indexOf('DescripcionItemEvaluado'),
+      check: headers.indexOf('CompletadoItem')
+    };
 
-    // Obtener nombres objetivo
+    // Validar columnas mínimas
+    if (col.inst < 0 || col.crit < 0) return null;
+
+    // Obtener nombres para filtrar
     const instrumento = getInstrumentoById(ss, instrumentId);
     const estudiante = getEstudiantes(ss).find(e => String(e.IDEstudiante) === String(studentId));
 
-    if (!instrumento || !estudiante) throw new Error("Instrumento o Estudiante no encontrado");
+    if (!instrumento || !estudiante) return null;
 
-    // Normalizar para búsqueda
     const targetInst = String(instrumento.NombreInstrumento).trim().toLowerCase();
     const targetEst = String(estudiante.NombreEstudiante).trim().toLowerCase();
 
-    // Filtrar filas
-    const filas = values.filter(r =>
-      String(r[iInst] || '').trim().toLowerCase() === targetInst &&
-      String(r[iEst] || '').trim().toLowerCase() === targetEst
-    );
+    // Filtrar filas (coincidencia flexible de texto)
+    const filas = values.filter(r => {
+      const rInst = String(r[col.inst] || '').trim().toLowerCase();
+      const rEst = String(r[col.estNombre] || '').trim().toLowerCase();
+      return rInst === targetInst && rEst === targetEst;
+    });
 
-    if (filas.length === 0) return null; // Esto dispara el error "No encontrado" si está vacío
+    if (filas.length === 0) return null;
 
-    // Construir resultado
-    const resultado = {
-      criterios: [],
-      items: [],
-      calificacion: 0
-    };
-    let notas = "";
-    let fecha = filas[0][headers.indexOf('FechaEvaluacion')];
+    // Reconstruir objeto
+    const resultado = { criterios: [], items: [], calificacion: 0 };
+    let notasGenerales = "";
+    let fechaEval = filas[0][col.fecha];
 
     filas.forEach(r => {
       // Rúbrica
-      if (iCrit > -1 && r[iCrit]) {
+      if (col.crit > -1 && r[col.crit]) {
         resultado.criterios.push({
-          criterio: r[iCrit],
-          nivel: r[iNivel],
-          puntos: r[iPunt]
+          criterio: String(r[col.crit]), // Guardar nombre exacto
+          nivel: String(r[col.nivel]),   // Guardar nivel exacto (ej: "Competent")
+          puntos: r[col.puntos]
         });
       }
-      // Lista de Cotejo
-      if (iItemDesc > -1 && r[iItemDesc]) {
+      // Cotejo
+      if (col.item > -1 && r[col.item]) {
         resultado.items.push({
-          item: r[iItemDesc],
-          completado: (r[iItemComp] === 'Sí' || r[iItemComp] === true)
+          item: String(r[col.item]),
+          completado: (r[col.check] === 'Sí' || r[col.check] === true)
         });
       }
-      // Datos globales (se sobrescriben, asumimos consistencia)
-      if (iNota > -1 && r[iNota] !== "") resultado.calificacion = r[iNota];
-      if (iCom > -1 && r[iCom] !== "") notas = r[iCom];
+      // Globales (se sobrescriben, tomamos el último válido)
+      if (col.nota > -1 && r[col.nota] !== "") resultado.calificacion = r[col.nota];
+      if (col.coments > -1 && r[col.coments]) notasGenerales = r[col.coments];
     });
 
     return {
+      success: true, // Importante para el frontend
       id: "recovered",
       studentId: studentId,
       instrumentId: instrumentId,
-      fecha: fecha,
       resultado: resultado,
-      notes: notas
+      notes: notasGenerales,
+      fecha: fechaEval
     };
 
-  } catch (error) {
-    Logger.log(`Error getStudentEvaluation: ${error.message}`);
+  } catch (e) {
+    Logger.log("Error getStudentEvaluation: " + e.toString());
     return null;
   }
 }
