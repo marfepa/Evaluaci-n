@@ -576,6 +576,162 @@
       justify-content: flex-end;
     }
 
+    /* Evaluation Panel Styles */
+    .evaluation-panel {
+      position: fixed;
+      top: 0;
+      right: -600px;
+      width: 600px;
+      max-width: 90vw;
+      height: 100vh;
+      background: var(--card-bg);
+      box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+      z-index: 1001;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .evaluation-panel.active {
+      right: 0;
+    }
+
+    .evaluation-panel-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .evaluation-panel-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .evaluation-panel-header {
+      padding: 1.5rem;
+      border-bottom: 2px solid var(--border);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .evaluation-panel-header button {
+      color: white !important;
+      opacity: 0.9;
+      transition: opacity 0.2s;
+    }
+
+    .evaluation-panel-header button:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .evaluation-panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+    }
+
+    .evaluation-criterion {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      transition: var(--transition);
+    }
+
+    .evaluation-criterion:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+    }
+
+    .evaluation-criterion-title {
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .evaluation-levels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
+    .evaluation-level {
+      position: relative;
+    }
+
+    .evaluation-level input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .evaluation-level label {
+      display: block;
+      padding: 0.75rem;
+      text-align: center;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 0.875rem;
+      font-weight: 500;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .evaluation-level input[type="radio"]:checked + label {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .evaluation-level label:hover {
+      border-color: var(--primary);
+      background: rgba(37, 99, 235, 0.05);
+    }
+
+    .evaluation-notes {
+      margin-top: 1rem;
+    }
+
+    .evaluation-notes textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      resize: vertical;
+      transition: var(--transition);
+    }
+
+    .evaluation-notes textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
     @media (max-width: 768px) {
       .header h1 {
         font-size: 1.5rem;
@@ -678,6 +834,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="overview">📈 Resumen</button>
       <button class="tab" data-tab="students">👥 Estudiantes</button>
+      <button class="tab" data-tab="evaluate">✅ Evaluar</button>
       <button class="tab" data-tab="attendance">📋 Asistencia</button>
       <button class="tab" data-tab="grades">📝 Calificaciones</button>
       <button class="tab" data-tab="instruments">🎯 Instrumentos</button>
@@ -765,6 +922,21 @@
             Ver Instrumentos →
           </button>
         </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">🔗</div>
+            <div>
+              <div class="card-title">Herramienta Externa</div>
+            </div>
+          </div>
+          <div class="card-description">
+            Accede a recursos y herramientas complementarias.
+          </div>
+          <button class="btn btn-outline" onclick="abrirEnlaceExternoDashboard()">
+            Abrir Herramienta →
+          </button>
+        </div>
       </div>
     </div>
 
@@ -806,6 +978,89 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Evaluate Tab -->
+    <div id="evaluate" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon success">✅</div>
+          <div>
+            <div class="card-title">Evaluación de Estudiantes</div>
+            <div class="card-description">Selecciona curso y rúbrica para comenzar a evaluar</div>
+          </div>
+        </div>
+
+        <!-- Selección de Curso y Rúbrica -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Curso</label>
+            <select class="form-select" id="evaluateCourseSelect" onchange="onEvaluateCourseChange()">
+              <option value="">Selecciona un curso...</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Rúbrica/Instrumento</label>
+            <select class="form-select" id="evaluateInstrumentSelect" onchange="onEvaluateInstrumentChange()">
+              <option value="">Primero selecciona un curso...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Información del instrumento seleccionado -->
+        <div id="evaluateInstrumentInfo" style="display: none; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid var(--secondary);">
+          <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--secondary);">📋 Instrumento seleccionado</div>
+          <div id="evaluateInstrumentDetails" style="font-size: 0.875rem; color: var(--text-light);"></div>
+        </div>
+
+        <!-- Lista de Estudiantes -->
+        <div id="evaluateStudentsList" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <label class="form-label" style="margin-bottom: 0;">
+              Selecciona estudiantes para evaluar
+              <span style="color: var(--text-light); font-size: 0.875rem; font-weight: 400;">(selección múltiple para evaluación grupal)</span>
+            </label>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="selectAllStudents()">
+                ✓ Seleccionar Todos
+              </button>
+              <button class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="clearStudentSelection()">
+                ✗ Limpiar Selección
+              </button>
+            </div>
+          </div>
+
+          <!-- Estudiantes ya evaluados (opcional) -->
+          <div id="evaluatedStudentsInfo" style="display: none; padding: 0.75rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem;">
+            <strong>ℹ️ Estudiantes evaluados:</strong> <span id="evaluatedStudentsText"></span>
+          </div>
+
+          <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table id="evaluateStudentsTable" style="width: 100%; border-collapse: collapse;">
+              <thead style="position: sticky; top: 0; background: var(--bg); z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <tr>
+                  <th style="width: 50px; text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleAllStudents()" style="width: 18px; height: 18px; cursor: pointer;">
+                  </th>
+                  <th style="text-align: left; padding: 1rem; border-bottom: 2px solid var(--border);">Estudiante</th>
+                  <th style="text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">Estado</th>
+                  <th style="width: 150px; text-align: center; padding: 1rem; border-bottom: 2px solid var(--border);">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="evaluateStudentsTableBody">
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn btn-primary" onclick="openEvaluationPanel()" id="openEvaluationBtn" disabled>
+              📝 Abrir Panel de Evaluación
+            </button>
+            <span id="selectedStudentsCount" style="color: var(--text-light); font-size: 0.875rem;"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -1333,6 +1588,43 @@
     </div>
   </div>
 
+  <!-- Evaluation Side Panel -->
+  <div id="evaluationPanel" class="evaluation-panel">
+    <div class="evaluation-panel-header">
+      <div style="flex: 1;">
+        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">Panel de Evaluación</h3>
+        <p id="evaluationPanelSubtitle" style="margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-light);"></p>
+      </div>
+      <button onclick="closeEvaluationPanel()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); padding: 0.25rem; line-height: 1;">×</button>
+    </div>
+
+    <div class="evaluation-panel-content">
+      <!-- Student Selection Info -->
+      <div id="evaluationStudentsInfo" style="padding: 1rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-bottom: 1.5rem;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--primary);">Evaluando a:</div>
+        <div id="evaluationStudentsList" style="font-size: 0.875rem;"></div>
+      </div>
+
+      <!-- Evaluation Form -->
+      <div id="evaluationForm">
+        <!-- Dynamic content will be inserted here based on instrument type -->
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--border); position: sticky; bottom: 0; background: white;">
+        <button class="btn btn-outline" onclick="duplicateEvaluation()" id="duplicateBtn" style="flex: 1;">
+          📋 Duplicar a otro alumno
+        </button>
+        <button class="btn btn-primary" onclick="saveEvaluation()" id="saveEvaluationBtn" style="flex: 2;">
+          💾 Guardar Evaluación
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel Overlay -->
+  <div id="evaluationPanelOverlay" class="evaluation-panel-overlay" onclick="closeEvaluationPanel()"></div>
+
   <script>
     // ============================================================================
     // CONTEXT DETECTION AND API WRAPPER
@@ -1365,27 +1657,33 @@
      * @returns {Promise} - Promise that resolves with the response
      */
     function callBackend(functionName, ...args) {
+      console.log(`🔧 [callBackend] Llamando a "${functionName}" con args:`, args);
+      console.log(`🔧 [callBackend] Modo: ${isModalMode ? 'Modal' : 'Web App'}`);
+
       return new Promise((resolve, reject) => {
         if (isModalMode) {
           // Modal mode: use google.script.run
           try {
+            console.log(`📞 [callBackend] Ejecutando google.script.run.${functionName}()`);
             google.script.run
               .withSuccessHandler(function(result) {
-                console.log(`Success: ${functionName}`, result);
+                console.log(`✅ [callBackend] Success: ${functionName}`, result);
+                console.log(`✅ [callBackend] Tipo de resultado:`, typeof result);
+                console.log(`✅ [callBackend] Keys:`, result ? Object.keys(result) : 'null');
                 resolve(result);
               })
               .withFailureHandler(function(error) {
-                console.error(`Error calling ${functionName}:`, error);
+                console.error(`❌ [callBackend] Error calling ${functionName}:`, error);
                 reject(new Error(error.message || error.toString()));
               })
               [functionName](...args);
           } catch (error) {
-            console.error(`Exception calling ${functionName}:`, error);
+            console.error(`❌ [callBackend] Exception calling ${functionName}:`, error);
             reject(error);
           }
         } else {
           // Web app mode: use fetch to call the backend
-          console.log(`Calling ${functionName} via POST`, args);
+          console.log(`🌐 [callBackend] Calling ${functionName} via POST to ${webAppUrl}`, args);
           fetch(webAppUrl, {
             method: 'POST',
             headers: {
@@ -1400,13 +1698,17 @@
             credentials: 'include'
           })
           .then(response => {
+            console.log(`📥 [callBackend] Response status:`, response.status, response.statusText);
             if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
           })
           .then(data => {
-            console.log(`Response from ${functionName}:`, data);
+            console.log(`✅ [callBackend] Response from ${functionName}:`, data);
+            console.log(`✅ [callBackend] data.error:`, data.error);
+            console.log(`✅ [callBackend] data.result:`, data.result);
+            console.log(`✅ [callBackend] Tipo de data.result:`, typeof data.result);
             if (data.error) {
               reject(new Error(data.error));
             } else {
@@ -1414,7 +1716,7 @@
             }
           })
           .catch(error => {
-            console.error(`Fetch error calling ${functionName}:`, error);
+            console.error(`❌ [callBackend] Fetch error calling ${functionName}:`, error);
             reject(error);
           });
         }
@@ -1596,6 +1898,11 @@
       loadTabData(tabId);
     }
 
+    function abrirEnlaceExternoDashboard() {
+      const url = 'https://script.google.com/a/macros/scorazon.hhdc.net/s/AKfycbysSeb9LlsIQ48K5LemLoPh8a_5BaiLXKp7hSd7HOG7nQwWP3NVn7NMwAKTG9nnmCfD/exec';
+      window.open(url, '_blank');
+    }
+
     function loadTabData(tabId) {
       switch(tabId) {
         case 'overview':
@@ -1604,6 +1911,9 @@
         case 'students':
           loadStudents();
           loadCourses();
+          break;
+        case 'evaluate':
+          loadEvaluationCourses();
           break;
         case 'attendance':
           // Set today's date
@@ -3146,26 +3456,139 @@
 
       try {
         const response = await callBackend('leerReporteExistente', nombreHoja);
-        console.log('Respuesta de leerReporteExistente:', response);
+        console.log('🔍 [loadReportInDashboard] Respuesta RAW:', response);
+        console.log('🔍 [loadReportInDashboard] Tipo:', typeof response);
+        console.log('🔍 [loadReportInDashboard] Keys:', response ? Object.keys(response) : 'null');
         hideLoading();
 
         // Aplicar el mismo unwrapping que en viewExistingReports
-        if (response && response.success) {
-          const actualData = response.result || response;
-          console.log('Datos después de unwrap:', actualData);
+        let actualData = null;
 
-          if (actualData && actualData.success) {
-            showReportResults(nombreHoja, actualData.data);
-          } else {
-            showError('Error', actualData?.message || 'No se pudo cargar el reporte');
-          }
+        // Web App mode: response.result contiene el resultado
+        if (response && response.success && response.result) {
+          console.log('✅ Modo Web App detectado (response.result)');
+          actualData = response.result;
+        }
+        // Modal mode: response es directamente el resultado
+        else if (response && response.success !== undefined) {
+          console.log('✅ Modo Modal detectado (response directo)');
+          actualData = response;
+        }
+        // Fallback
+        else {
+          console.log('⚠️ Modo desconocido, usando response directo');
+          actualData = response;
+        }
+
+        console.log('📊 [loadReportInDashboard] Datos después de unwrap:', actualData);
+        console.log('📊 [loadReportInDashboard] actualData.success:', actualData?.success);
+        console.log('📊 [loadReportInDashboard] actualData.data:', actualData?.data);
+        console.log('📊 [loadReportInDashboard] actualData.headers:', actualData?.headers);
+
+        if (actualData && actualData.success) {
+          // Mostrar el reporte con su título personalizado
+          console.log('✅ Llamando a showReportInModal');
+          showReportInModal(nombreHoja, actualData);
         } else {
-          showError('Error', response?.message || 'No se pudo cargar el reporte');
+          const errorMsg = actualData?.message || 'No se pudo cargar el reporte';
+          console.error('❌ Error:', errorMsg);
+          showError('Error', errorMsg);
         }
       } catch (err) {
         hideLoading();
+        console.error('❌ Excepción en loadReportInDashboard:', err);
         showError('Error al cargar reporte', err.message);
       }
+    }
+
+    /**
+     * Muestra un reporte completo en el modal con formato mejorado
+     */
+    function showReportInModal(nombreHoja, reportData) {
+      console.log('📋 [showReportInModal] nombreHoja:', nombreHoja);
+      console.log('📋 [showReportInModal] reportData:', reportData);
+
+      const { data, headers, sheetName } = reportData;
+
+      console.log('📋 [showReportInModal] data:', data);
+      console.log('📋 [showReportInModal] headers:', headers);
+      console.log('📋 [showReportInModal] sheetName:', sheetName);
+      console.log('📋 [showReportInModal] data.length:', data?.length);
+      console.log('📋 [showReportInModal] Primer registro:', data?.[0]);
+
+      document.getElementById('reportResultsTitle').textContent = nombreHoja;
+      const body = document.getElementById('reportResultsBody');
+
+      if (!data || data.length === 0) {
+        console.warn('⚠️ [showReportInModal] No hay datos para mostrar');
+        body.innerHTML = '<div class="alert alert-info">No hay datos para mostrar en este reporte</div>';
+        showModal('reportResultsModal');
+        return;
+      }
+
+      // Crear tabla con los datos del reporte
+      const tableHeaders = headers && headers.length > 0 ? headers : Object.keys(data[0]);
+      console.log('📋 [showReportInModal] tableHeaders:', tableHeaders);
+
+      body.innerHTML = `
+        <div style="margin-bottom: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #2563eb;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 0.875rem; color: #64748b;">Reporte:</div>
+              <div style="font-weight: 600; color: #1e293b;">${sheetName || nombreHoja}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.875rem; color: #64748b;">Total de registros:</div>
+              <div style="font-weight: 700; color: #2563eb; font-size: 1.25rem;">${data.length}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+          <table>
+            <thead style="position: sticky; top: 0; background: var(--bg); z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <tr>
+                ${tableHeaders.map(h => `<th style="padding: 12px; white-space: nowrap;">${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map((row, idx) => {
+                try {
+                  return `
+                    <tr style="transition: background 0.2s; ${idx % 2 === 0 ? 'background: #ffffff;' : 'background: #f8fafc;'}">
+                      ${tableHeaders.map(h => {
+                        try {
+                          const value = row[h];
+                          const displayValue = value !== null && value !== undefined && value !== '' ? value : '-';
+
+                          // Detectar si es un número para alinearlo a la derecha
+                          const isNumber = typeof value === 'number' || (!isNaN(parseFloat(value)) && isFinite(value));
+                          const alignment = isNumber ? 'text-align: right;' : 'text-align: left;';
+
+                          return `<td style="padding: 10px; ${alignment}">${displayValue}</td>`;
+                        } catch (cellError) {
+                          console.error('❌ Error renderizando celda:', cellError, 'Header:', h, 'Row:', row);
+                          return `<td style="padding: 10px; color: red;">Error</td>`;
+                        }
+                      }).join('')}
+                    </tr>
+                  `;
+                } catch (rowError) {
+                  console.error('❌ Error renderizando fila:', rowError, 'Row:', row);
+                  return `<tr><td colspan="${tableHeaders.length}" style="color: red;">Error en fila ${idx}</td></tr>`;
+                }
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 16px; padding: 12px; background: #f1f5f9; border-radius: 8px; font-size: 0.875rem; color: #64748b; text-align: center;">
+          💡 Este reporte contiene ${data.length} registro${data.length !== 1 ? 's' : ''} y ${tableHeaders.length} columna${tableHeaders.length !== 1 ? 's' : ''}
+        </div>
+      `;
+
+      console.log('✅ [showReportInModal] Tabla renderizada exitosamente');
+      showModal('reportResultsModal');
     }
 
     async function calculateWeightedAverage() {
@@ -3386,21 +3809,33 @@
               <h4 style="color: #2563eb; margin-bottom: 10px;">${icono} ${titulo}</h4>
               <div style="display: flex; flex-direction: column; gap: 8px;">
                 ${listaReportes.map(r => `
-                  <button
-                    class="btn btn-outline"
-                    style="text-align: left; padding: 12px; display: flex; justify-content: space-between; align-items: center;"
-                    data-reporte-nombre="${r.nombre}"
-                  >
-                    <div>
-                      <div style="font-weight: 600;">${r.nombre}</div>
-                      <div style="font-size: 0.85em; color: #64748b; margin-top: 4px;">
-                        ${r.tipo === 'notas' ? `${r.info.curso} - ${r.info.situacion}` : r.info.descripcion || r.info.fecha || ''}
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button
+                      class="btn btn-outline"
+                      style="text-align: left; padding: 12px; display: flex; justify-content: space-between; align-items: center; flex: 1;"
+                      data-reporte-nombre="${r.nombre}"
+                      data-accion="exportar"
+                    >
+                      <div>
+                        <div style="font-weight: 600;">${r.nombre}</div>
+                        <div style="font-size: 0.85em; color: #64748b; margin-top: 4px;">
+                          ${r.tipo === 'notas' ? `${r.info.curso} - ${r.info.situacion}` : r.info.descripcion || r.info.fecha || ''}
+                        </div>
                       </div>
-                    </div>
-                    <div style="font-size: 0.8em; color: #94a3b8;">
-                      ${formatFecha(r.ultimaModificacion)}
-                    </div>
-                  </button>
+                      <div style="font-size: 0.8em; color: #94a3b8;">
+                        ${formatFecha(r.ultimaModificacion)}
+                      </div>
+                    </button>
+                    <button
+                      class="btn btn-primary"
+                      style="padding: 12px 16px; white-space: nowrap;"
+                      data-reporte-nombre="${r.nombre}"
+                      data-accion="visualizar"
+                      title="Visualizar este reporte"
+                    >
+                      👁️ Visualizar
+                    </button>
+                  </div>
                 `).join('')}
               </div>
             </div>
@@ -3408,10 +3843,10 @@
         };
 
         dialog.innerHTML = `
-          <div class="modal-content" style="max-width: 700px; max-height: 85vh; overflow-y: auto;">
-            <h3>Exportar Reporte a PDF</h3>
+          <div class="modal-content" style="max-width: 800px; max-height: 85vh; overflow-y: auto;">
+            <h3>Consultar y Exportar Reportes</h3>
             <p style="color: #64748b; margin-bottom: 20px;">
-              Selecciona un reporte para exportarlo en formato PDF
+              Selecciona un reporte para visualizarlo o exportarlo en formato PDF
             </p>
 
             ${crearListaReportes(reportesPorTipo.notas, 'Reportes de Notas', '📄')}
@@ -3439,8 +3874,15 @@
         botonesReportes.forEach(btn => {
           btn.addEventListener('click', async () => {
             const nombreReporte = btn.getAttribute('data-reporte-nombre');
+            const accion = btn.getAttribute('data-accion');
+            console.log(`🔧 [exportData] Botón clickeado - Acción: ${accion}, Reporte: ${nombreReporte}`);
             dialog.remove();
-            await exportarReporteSeleccionado(nombreReporte);
+
+            if (accion === 'visualizar') {
+              await visualizarReporte(nombreReporte);
+            } else if (accion === 'exportar') {
+              await exportarReporteSeleccionado(nombreReporte);
+            }
           });
         });
 
@@ -3454,6 +3896,166 @@
       } catch (err) {
         hideLoading();
         showError('Error al exportar datos', err.message);
+      }
+    }
+
+    /**
+     * Visualizar un reporte en un modal con tabla interactiva
+     * @param {string} nombreReporte - Nombre exacto de la hoja del reporte
+     */
+    async function visualizarReporte(nombreReporte) {
+      console.log(`🔧 [visualizarReporte] Iniciando visualización de: "${nombreReporte}"`);
+      showLoading(`Cargando reporte "${nombreReporte}"...`);
+
+      try {
+        // Llamar al backend para obtener los datos del reporte
+        const response = await callBackend('leerReporteExistente', nombreReporte);
+        console.log(`📊 [visualizarReporte] Respuesta recibida:`, response);
+        hideLoading();
+
+        // Validar respuesta
+        if (!response || !response.success) {
+          const errorMsg = response?.message || 'No se pudo leer el reporte. Verifica que el nombre sea correcto.';
+          console.error(`❌ [visualizarReporte] Error:`, errorMsg);
+          showError('Error al leer reporte', errorMsg);
+          return;
+        }
+
+        const { data, headers, sheetName, rowCount, colCount, lastModified } = response;
+        console.log(`✅ [visualizarReporte] Datos obtenidos - Filas: ${rowCount}, Columnas: ${colCount}`);
+
+        // Validar que haya datos
+        if (!data || data.length === 0) {
+          console.warn(`⚠️ [visualizarReporte] El reporte "${nombreReporte}" no contiene datos`);
+          showError('Reporte vacío', 'Este reporte no contiene datos para mostrar.');
+          return;
+        }
+
+        // Crear modal para mostrar los datos
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'modalVisualizarReporte';
+
+        // Formatear fecha de última modificación
+        let fechaFormateada = 'Desconocida';
+        try {
+          if (lastModified) {
+            fechaFormateada = new Date(lastModified).toLocaleString('es-ES', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+        } catch (err) {
+          console.warn(`⚠️ [visualizarReporte] Error al formatear fecha:`, err);
+        }
+
+        // Renderizar tabla con los datos
+        console.log(`📋 [visualizarReporte] Renderizando tabla...`);
+        const tableHeaders = headers || Object.keys(data[0] || {});
+        console.log(`📋 [visualizarReporte] Headers:`, tableHeaders);
+
+        // Generar HTML de la tabla con manejo de errores por celda
+        let tableHTML = '';
+        try {
+          tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+              <thead>
+                <tr style="background: #f8fafc; position: sticky; top: 0; z-index: 10;">
+                  ${tableHeaders.map(h => `
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #1e293b;">
+                      ${h}
+                    </th>
+                  `).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map((row, idx) => {
+                  try {
+                    return `
+                      <tr style="border-bottom: 1px solid #f1f5f9; ${idx % 2 === 0 ? 'background: #fafafa;' : ''}">
+                        ${tableHeaders.map(header => {
+                          try {
+                            const value = row[header];
+                            const displayValue = value !== null && value !== undefined && value !== '' ? value : '-';
+                            const isNumber = typeof value === 'number' || (!isNaN(value) && value !== '');
+                            return `<td style="padding: 10px; ${isNumber ? 'text-align: right;' : ''}">${displayValue}</td>`;
+                          } catch (cellError) {
+                            console.error(`❌ [visualizarReporte] Error en celda - Fila ${idx}, Header ${header}:`, cellError);
+                            return `<td style="padding: 10px; color: red;">Error</td>`;
+                          }
+                        }).join('')}
+                      </tr>
+                    `;
+                  } catch (rowError) {
+                    console.error(`❌ [visualizarReporte] Error en fila ${idx}:`, rowError);
+                    return `<tr><td colspan="${tableHeaders.length}" style="padding: 10px; color: red;">Error en fila ${idx}</td></tr>`;
+                  }
+                }).join('')}
+              </tbody>
+            </table>
+          `;
+        } catch (tableError) {
+          console.error(`❌ [visualizarReporte] Error al generar tabla HTML:`, tableError);
+          showError('Error de renderización', 'No se pudo generar la tabla. Revisa la consola para más detalles.');
+          return;
+        }
+
+        // Crear contenido del modal
+        modal.innerHTML = `
+          <div class="modal-content" style="max-width: 95vw; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;">
+            <div style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
+              <h3 style="margin: 0 0 8px 0; color: #1e293b;">📊 ${sheetName || nombreReporte}</h3>
+              <div style="display: flex; gap: 16px; font-size: 0.85em; color: #64748b;">
+                <span><strong>Filas:</strong> ${rowCount}</span>
+                <span><strong>Columnas:</strong> ${colCount}</span>
+                <span><strong>Última modificación:</strong> ${fechaFormateada}</span>
+              </div>
+            </div>
+
+            <div style="flex: 1; overflow: auto; padding: 20px;">
+              ${tableHTML}
+            </div>
+
+            <div style="padding: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 0.85em; color: #64748b;">
+                Total de registros: ${rowCount}
+              </div>
+              <button class="btn btn-outline" onclick="document.getElementById('modalVisualizarReporte').remove()">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        `;
+
+        // Añadir modal al DOM y mostrarlo
+        document.body.appendChild(modal);
+        modal.classList.add('active');
+        console.log(`✅ [visualizarReporte] Modal renderizado exitosamente`);
+
+        // Cerrar al hacer clic fuera del modal
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+          }
+        });
+
+        // Cerrar con tecla Escape
+        const escapeHandler = (e) => {
+          if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', escapeHandler);
+          }
+        };
+        document.addEventListener('keydown', escapeHandler);
+
+      } catch (err) {
+        hideLoading();
+        console.error(`❌ [visualizarReporte] Excepción capturada:`, err);
+        console.error(`Stack:`, err.stack);
+        showError('Error al visualizar reporte', err.message || 'Error desconocido. Revisa la consola para más detalles.');
       }
     }
 
@@ -3546,6 +4148,965 @@
 
       console.log('Dashboard initialized successfully');
     }
+
+    // ============================================================================
+    // EVALUATION SECTION FUNCTIONS
+    // ============================================================================
+
+    let evaluationData = {
+      selectedCourse: null,
+      selectedInstrument: null,
+      instrumentDetails: null,
+      selectedStudents: [],
+      allStudents: [],
+      allInstruments: [] // Cache all instruments
+    };
+
+    /**
+     * Load courses for evaluation section
+     * Uses the same approach as the instruments section
+     */
+    async function loadEvaluationCourses() {
+      try {
+        // Load all instruments first (same as instruments section)
+        console.log('📊 Cargando todos los instrumentos para evaluación...');
+        const instruments = await callBackend('getInstrumentosData');
+        evaluationData.allInstruments = instruments;
+        console.log('✅ Instrumentos cargados:', instruments.length);
+
+        // Extract unique courses from instruments
+        const coursesSet = new Set();
+        instruments.forEach(inst => {
+          if (inst.Curso) coursesSet.add(inst.Curso);
+        });
+
+        const courses = Array.from(coursesSet).sort();
+        console.log('📚 Cursos encontrados:', courses);
+
+        const select = document.getElementById('evaluateCourseSelect');
+        select.innerHTML = '<option value="">Selecciona un curso...</option>';
+
+        courses.forEach(course => {
+          const option = document.createElement('option');
+          option.value = course;
+          option.textContent = course;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading courses:', error);
+        showError('Error al cargar cursos', error.message);
+      }
+    }
+
+    /**
+     * Handle course selection change
+     * Uses client-side filtering like the instruments section
+     */
+    async function onEvaluateCourseChange() {
+      const courseSelect = document.getElementById('evaluateCourseSelect');
+      const instrumentSelect = document.getElementById('evaluateInstrumentSelect');
+      const course = courseSelect.value;
+
+      evaluationData.selectedCourse = course;
+      evaluationData.selectedInstrument = null;
+      evaluationData.selectedStudents = [];
+
+      // Reset instrument selection
+      instrumentSelect.innerHTML = '<option value="">Cargando instrumentos...</option>';
+      document.getElementById('evaluateInstrumentInfo').style.display = 'none';
+      document.getElementById('evaluateStudentsList').style.display = 'none';
+
+      if (!course) {
+        instrumentSelect.innerHTML = '<option value="">Primero selecciona un curso...</option>';
+        return;
+      }
+
+      try {
+        console.log('🔍 Filtrando instrumentos para curso:', course);
+
+        // Filter instruments by selected course (client-side filtering)
+        const filteredInstruments = evaluationData.allInstruments.filter(inst => inst.Curso === course);
+        console.log(`📋 Instrumentos del curso ${course}:`, filteredInstruments.length);
+
+        instrumentSelect.innerHTML = '<option value="">Selecciona un instrumento...</option>';
+
+        if (filteredInstruments.length === 0) {
+          instrumentSelect.innerHTML = '<option value="">No hay instrumentos para este curso</option>';
+          return;
+        }
+
+        filteredInstruments.forEach(instrument => {
+          const option = document.createElement('option');
+          option.value = instrument.IDInstrumento;
+          option.textContent = `${instrument.NombreInstrumento} (${instrument.TipoInstrumento})`;
+          option.dataset.instrument = JSON.stringify({
+            id: instrument.IDInstrumento,
+            nombre: instrument.NombreInstrumento,
+            tipo: instrument.TipoInstrumento,
+            situacion: instrument.Situacion
+          });
+          instrumentSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error filtering instruments:', error);
+        showError('Error al filtrar instrumentos', error.message);
+        instrumentSelect.innerHTML = '<option value="">Error al filtrar instrumentos</option>';
+      }
+    }
+
+    /**
+     * Handle instrument selection change
+     */
+    async function onEvaluateInstrumentChange() {
+      const instrumentSelect = document.getElementById('evaluateInstrumentSelect');
+      const selectedOption = instrumentSelect.options[instrumentSelect.selectedIndex];
+
+      if (!selectedOption || !selectedOption.dataset.instrument) {
+        document.getElementById('evaluateInstrumentInfo').style.display = 'none';
+        document.getElementById('evaluateStudentsList').style.display = 'none';
+        evaluationData.selectedInstrument = null;
+        return;
+      }
+
+      const instrument = JSON.parse(selectedOption.dataset.instrument);
+      evaluationData.selectedInstrument = instrument.id;
+      evaluationData.instrumentDetails = instrument;
+
+      // Show instrument info
+      const infoDiv = document.getElementById('evaluateInstrumentInfo');
+      const detailsDiv = document.getElementById('evaluateInstrumentDetails');
+      detailsDiv.innerHTML = `
+        <strong>Nombre:</strong> ${instrument.nombre}<br>
+        <strong>Tipo:</strong> ${instrument.tipo}<br>
+        <strong>Situación:</strong> ${instrument.situacion || 'N/A'}
+      `;
+      infoDiv.style.display = 'block';
+
+      // Load students for this course
+      try {
+        showLoading('Cargando estudiantes...');
+        const students = await callBackend('getStudentsByCourse', evaluationData.selectedCourse);
+        evaluationData.allStudents = students;
+        hideLoading();
+
+        // Check which students have been evaluated
+        const evaluations = await callBackend('getEvaluationsByInstrument', instrument.id);
+        const evaluatedStudentIds = new Set(evaluations.map(e => e.studentId));
+
+        // Render students table
+        renderEvaluateStudentsTable(students, evaluatedStudentIds);
+        document.getElementById('evaluateStudentsList').style.display = 'block';
+      } catch (error) {
+        hideLoading();
+        console.error('Error loading students:', error);
+        showError('Error al cargar estudiantes', error.message);
+      }
+    }
+
+    /**
+     * Render students table for evaluation
+     */
+    function renderEvaluateStudentsTable(students, evaluatedStudentIds) {
+      const tbody = document.getElementById('evaluateStudentsTableBody');
+      tbody.innerHTML = '';
+
+      students.forEach(student => {
+        const isEvaluated = evaluatedStudentIds.has(student.id);
+        const row = document.createElement('tr');
+        row.style.background = isEvaluated ? 'rgba(16, 185, 129, 0.05)' : 'transparent';
+
+        row.innerHTML = `
+          <td style="text-align: center; padding: 1rem;">
+            <input type="checkbox"
+                   class="student-checkbox"
+                   value="${student.id}"
+                   data-student='${JSON.stringify(student)}'
+                   onchange="onStudentCheckboxChange()"
+                   style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+          </td>
+          <td style="padding: 1rem;">
+            <div style="font-weight: 500;">${student.nombre}</div>
+            <div style="font-size: 0.875rem; color: var(--text-light);">${student.email || ''}</div>
+          </td>
+          <td style="text-align: center; padding: 1rem;">
+            ${isEvaluated ? '<span style="color: var(--secondary); font-weight: 500;">✓ Evaluado</span>' : '<span style="color: var(--text-light);">Pendiente</span>'}
+          </td>
+          <td style="text-align: center; padding: 1rem;">
+            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+              ${isEvaluated ? `
+                <button class="btn btn-outline btn-view-eval"
+                        style="padding: 0.5rem 0.75rem; font-size: 0.875rem; background: rgba(37, 99, 235, 0.05); border-color: var(--primary); color: var(--primary);"
+                        data-student-id="${student.id}">
+                  👁️ Ver
+                </button>
+                <button class="btn btn-outline btn-select-student"
+                        style="padding: 0.5rem 0.75rem; font-size: 0.875rem;"
+                        data-student-id="${student.id}">
+                  ✏️ Revisar
+                </button>
+              ` : `
+                <button class="btn btn-primary btn-select-student"
+                        style="padding: 0.5rem 0.75rem; font-size: 0.875rem;"
+                        data-student-id="${student.id}">
+                  📝 Evaluar
+                </button>
+              `}
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(row);
+      });
+
+      // Add event listeners to buttons (using event delegation would be better, but this works)
+      document.querySelectorAll('.btn-view-eval').forEach(btn => {
+        btn.addEventListener('click', () => {
+          viewStudentEvaluation(btn.dataset.studentId);
+        });
+      });
+
+      document.querySelectorAll('.btn-select-student').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const studentId = btn.dataset.studentId;
+          const checkbox = document.querySelector(`.student-checkbox[value="${studentId}"]`);
+          if (checkbox) {
+            const student = JSON.parse(checkbox.dataset.student);
+            selectSingleStudent(student);
+          }
+        });
+      });
+
+      updateSelectedCount();
+    }
+
+    /**
+     * Handle student checkbox change
+     */
+    function onStudentCheckboxChange() {
+      const checkboxes = document.querySelectorAll('.student-checkbox:checked');
+      evaluationData.selectedStudents = Array.from(checkboxes).map(cb => JSON.parse(cb.dataset.student));
+
+      updateSelectedCount();
+      updateSelectAllCheckbox();
+    }
+
+    /**
+     * Update selected students count
+     */
+    function updateSelectedCount() {
+      const count = evaluationData.selectedStudents.length;
+      const countSpan = document.getElementById('selectedStudentsCount');
+      const openBtn = document.getElementById('openEvaluationBtn');
+
+      if (count > 0) {
+        countSpan.textContent = `${count} estudiante${count > 1 ? 's' : ''} seleccionado${count > 1 ? 's' : ''}`;
+        openBtn.disabled = false;
+      } else {
+        countSpan.textContent = '';
+        openBtn.disabled = true;
+      }
+    }
+
+    /**
+     * Update "select all" checkbox state
+     */
+    function updateSelectAllCheckbox() {
+      const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+      const checkboxes = document.querySelectorAll('.student-checkbox');
+      const checkedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+
+      if (checkboxes.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      } else if (checkedCheckboxes.length === checkboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else if (checkedCheckboxes.length > 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
+    }
+
+    /**
+     * Toggle all students selection
+     */
+    function toggleAllStudents() {
+      const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+      const checkboxes = document.querySelectorAll('.student-checkbox');
+
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+      });
+
+      onStudentCheckboxChange();
+    }
+
+    /**
+     * Select all students
+     */
+    function selectAllStudents() {
+      const checkboxes = document.querySelectorAll('.student-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+      });
+      onStudentCheckboxChange();
+    }
+
+    /**
+     * Clear student selection
+     */
+    function clearStudentSelection() {
+      const checkboxes = document.querySelectorAll('.student-checkbox');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+      });
+      onStudentCheckboxChange();
+    }
+
+    /**
+     * Select a single student for evaluation
+     */
+    function selectSingleStudent(student) {
+      evaluationData.selectedStudents = [student];
+
+      // Uncheck all checkboxes
+      const checkboxes = document.querySelectorAll('.student-checkbox');
+      checkboxes.forEach(cb => cb.checked = false);
+
+      // Check only the selected student
+      const checkbox = document.querySelector(`.student-checkbox[value="${student.id}"]`);
+      if (checkbox) checkbox.checked = true;
+
+      updateSelectedCount();
+      updateSelectAllCheckbox();
+
+      // Open evaluation panel
+      openEvaluationPanel();
+    }
+
+    /**
+     * Open evaluation panel
+     */
+    async function openEvaluationPanel() {
+      if (evaluationData.selectedStudents.length === 0) {
+        showError('Por favor, selecciona al menos un estudiante');
+        return;
+      }
+
+      if (!evaluationData.instrumentDetails) {
+        showError('No hay instrumento seleccionado');
+        return;
+      }
+
+      try {
+        showLoading('Cargando instrumento...');
+
+        // Get full instrument details from backend
+        const fullInstrument = await callBackend('getInstrumentDetails', evaluationData.instrumentDetails.id);
+
+        hideLoading();
+
+        if (!fullInstrument) {
+          showError('No se pudo cargar el instrumento');
+          return;
+        }
+
+        // Update instrumentDetails with full data
+        evaluationData.instrumentDetails = {
+          ...evaluationData.instrumentDetails,
+          ...fullInstrument
+        };
+
+        console.log('📋 Instrumento completo cargado:', evaluationData.instrumentDetails);
+
+        // Update panel subtitle
+        const subtitle = document.getElementById('evaluationPanelSubtitle');
+        subtitle.textContent = `${evaluationData.instrumentDetails.nombre} - ${evaluationData.instrumentDetails.tipo}`;
+
+        // Update students list
+        const studentsList = document.getElementById('evaluationStudentsList');
+        studentsList.innerHTML = evaluationData.selectedStudents
+          .map(s => `<div style="padding: 0.25rem 0;">• ${s.nombre}</div>`)
+          .join('');
+
+        // Generate evaluation form
+        generateEvaluationForm();
+
+        // Show panel
+        document.getElementById('evaluationPanel').classList.add('active');
+        document.getElementById('evaluationPanelOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+      } catch (error) {
+        hideLoading();
+        console.error('Error loading instrument:', error);
+        showError('Error al cargar el instrumento', error.message);
+      }
+    }
+
+    /**
+     * Close evaluation panel
+     */
+    function closeEvaluationPanel() {
+      document.getElementById('evaluationPanel').classList.remove('active');
+      document.getElementById('evaluationPanelOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    /**
+     * Generate evaluation form based on instrument type
+     */
+    function generateEvaluationForm() {
+      const formDiv = document.getElementById('evaluationForm');
+      const instrument = evaluationData.instrumentDetails;
+
+      if (instrument.tipo === 'Rúbrica') {
+        generateRubricForm(formDiv, instrument);
+      } else if (instrument.tipo === 'Lista de Cotejo') {
+        generateChecklistForm(formDiv, instrument);
+      } else if (instrument.tipo === 'Calificación Directa') {
+        generateDirectGradeForm(formDiv, instrument);
+      }
+    }
+
+    /**
+     * Generate rubric evaluation form
+     */
+    function generateRubricForm(container, instrument) {
+      const criteria = instrument.criterios || [];
+
+      console.log('🎯 Generando formulario de rúbrica');
+      console.log('   Número de criterios:', criteria.length);
+      console.log('   Criterios completos:', criteria);
+
+      if (criteria.length === 0) {
+        container.innerHTML = `
+          <div style="padding: 2rem; text-align: center; color: var(--text-light);">
+            <p>⚠️ No se encontraron criterios para esta rúbrica.</p>
+            <p style="font-size: 0.875rem; margin-top: 0.5rem;">Verifica que la rúbrica tenga criterios definidos en la pestaña 'Definicion_Rubricas'.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Criterios de Evaluación</h4>
+          <p style="font-size: 0.875rem; color: var(--text-light);">Selecciona el nivel de desempeño para cada criterio</p>
+        </div>
+        ${criteria.map((criterio, index) => {
+          const niveles = criterio.niveles || [];
+          console.log(`   Criterio ${index + 1}: ${criterio.nombre} - ${niveles.length} niveles`);
+
+          return `
+          <div class="evaluation-criterion">
+            <div class="evaluation-criterion-title">${index + 1}. ${criterio.nombre}</div>
+            ${niveles.length === 0 ?
+              '<div style="padding: 0.5rem; color: var(--text-light); font-size: 0.875rem;">⚠️ Sin niveles definidos</div>' :
+              `<div class="evaluation-levels">
+                ${niveles.map(nivel => `
+                  <div class="evaluation-level">
+                    <input type="radio"
+                           id="criterio_${index}_${nivel.valor}"
+                           name="criterio_${index}"
+                           value="${nivel.valor}"
+                           data-puntos="${nivel.puntos}"
+                           data-nombre="${nivel.nombre}"
+                           data-descriptor="${(nivel.descriptor || '').replace(/"/g, '&quot;')}">
+                    <label for="criterio_${index}_${nivel.valor}" title="${nivel.descriptor || ''}">
+                      <strong>${nivel.nombre}</strong><br>
+                      <span style="font-size: 0.75rem; opacity: 0.8;">(${nivel.puntos} pts)</span>
+                      ${nivel.descriptor ? `<br><span style="font-size: 0.7rem; opacity: 0.7; display: block; margin-top: 0.25rem;">${nivel.descriptor.substring(0, 50)}${nivel.descriptor.length > 50 ? '...' : ''}</span>` : ''}
+                    </label>
+                  </div>
+                `).join('')}
+              </div>`
+            }
+          </div>
+        `;
+        }).join('')}
+        <div class="evaluation-notes">
+          <label class="form-label">Observaciones (opcional)</label>
+          <textarea id="evaluationNotes" placeholder="Añade comentarios sobre la evaluación..."></textarea>
+        </div>
+      `;
+    }
+
+    /**
+     * Generate checklist evaluation form
+     */
+    function generateChecklistForm(container, instrument) {
+      const items = instrument.items || [];
+
+      container.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Lista de Cotejo</h4>
+          <p style="font-size: 0.875rem; color: var(--text-light);">Marca los elementos completados</p>
+        </div>
+        ${items.map((item, index) => `
+          <div class="evaluation-criterion">
+            <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer;">
+              <input type="checkbox"
+                     id="item_${index}"
+                     name="item_${index}"
+                     value="1"
+                     style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);">
+              <span style="flex: 1;">${item.descripcion}</span>
+            </label>
+          </div>
+        `).join('')}
+        <div class="evaluation-notes">
+          <label class="form-label">Observaciones (opcional)</label>
+          <textarea id="evaluationNotes" placeholder="Añade comentarios sobre la evaluación..."></textarea>
+        </div>
+      `;
+    }
+
+    /**
+     * Generate direct grade evaluation form
+     */
+    function generateDirectGradeForm(container, instrument) {
+      container.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Calificación Directa</h4>
+          <p style="font-size: 0.875rem; color: var(--text-light);">Introduce la calificación numérica</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Calificación (0-10)</label>
+          <input type="number"
+                 id="directGrade"
+                 class="form-input"
+                 min="0"
+                 max="10"
+                 step="0.1"
+                 placeholder="Ej: 8.5"
+                 required>
+        </div>
+        <div class="evaluation-notes">
+          <label class="form-label">Observaciones (opcional)</label>
+          <textarea id="evaluationNotes" placeholder="Añade comentarios sobre la evaluación..."></textarea>
+        </div>
+      `;
+    }
+
+    /**
+     * Save evaluation
+     */
+    async function saveEvaluation() {
+      try {
+        const instrument = evaluationData.instrumentDetails;
+        const notes = document.getElementById('evaluationNotes')?.value || '';
+
+        let evaluationResult;
+
+        if (instrument.tipo === 'Rúbrica') {
+          evaluationResult = collectRubricData();
+        } else if (instrument.tipo === 'Lista de Cotejo') {
+          evaluationResult = collectChecklistData();
+        } else if (instrument.tipo === 'Calificación Directa') {
+          evaluationResult = collectDirectGradeData();
+        }
+
+        if (!evaluationResult) {
+          showError('Por favor, completa todos los campos requeridos');
+          return;
+        }
+
+        showLoading('Guardando evaluación...');
+
+        // Save evaluation for each selected student
+        for (const student of evaluationData.selectedStudents) {
+          const dataToSave = {
+            studentId: student.id,
+            studentName: student.nombre,
+            instrumentId: instrument.id,
+            instrumentName: instrument.nombre,
+            course: evaluationData.selectedCourse,
+            tipo: instrument.tipo,
+            resultado: evaluationResult,
+            notes: notes,
+            fecha: new Date().toISOString()
+          };
+
+          await callBackend('saveEvaluation', dataToSave);
+        }
+
+        hideLoading();
+        showSuccess(`Evaluación guardada para ${evaluationData.selectedStudents.length} estudiante(s)`);
+
+        // Close panel and refresh
+        closeEvaluationPanel();
+        onEvaluateInstrumentChange();
+
+      } catch (error) {
+        hideLoading();
+        console.error('Error saving evaluation:', error);
+        showError('Error al guardar la evaluación', error.message);
+      }
+    }
+
+    /**
+     * Collect rubric evaluation data
+     */
+    function collectRubricData() {
+      const criteria = evaluationData.instrumentDetails.criterios || [];
+      const results = [];
+      let totalPoints = 0;
+
+      console.log('📊 Recopilando datos de rúbrica');
+
+      for (let i = 0; i < criteria.length; i++) {
+        const selected = document.querySelector(`input[name="criterio_${i}"]:checked`);
+        if (!selected) {
+          showError(`Por favor, evalúa el criterio: ${criteria[i].nombre}`);
+          return null;
+        }
+
+        const points = parseFloat(selected.dataset.puntos);
+        totalPoints += points;
+
+        const resultItem = {
+          criterio: criteria[i].nombre,
+          criterioId: criteria[i].id,
+          nivel: selected.value,
+          nivelNombre: selected.dataset.nombre || selected.value,
+          puntos: points,
+          descriptor: selected.dataset.descriptor || ''
+        };
+
+        console.log(`   ✓ ${resultItem.criterio}: ${resultItem.nivelNombre} (${points} pts)`);
+        results.push(resultItem);
+      }
+
+      console.log(`   Total: ${totalPoints} puntos`);
+
+      return {
+        criterios: results,
+        puntosTotales: totalPoints,
+        calificacion: totalPoints
+      };
+    }
+
+    /**
+     * Collect checklist evaluation data
+     */
+    function collectChecklistData() {
+      const items = evaluationData.instrumentDetails.items || [];
+      const results = [];
+      let completedCount = 0;
+
+      items.forEach((item, index) => {
+        const checked = document.getElementById(`item_${index}`)?.checked || false;
+        if (checked) completedCount++;
+
+        results.push({
+          item: item.descripcion,
+          completado: checked
+        });
+      });
+
+      return {
+        items: results,
+        completados: completedCount,
+        total: items.length,
+        porcentaje: (completedCount / items.length * 100).toFixed(2)
+      };
+    }
+
+    /**
+     * Collect direct grade evaluation data
+     */
+    function collectDirectGradeData() {
+      const gradeInput = document.getElementById('directGrade');
+      const grade = parseFloat(gradeInput?.value);
+
+      if (isNaN(grade) || grade < 0 || grade > 10) {
+        showError('Por favor, introduce una calificación válida entre 0 y 10');
+        return null;
+      }
+
+      return {
+        calificacion: grade
+      };
+    }
+
+    /**
+     * Duplicate evaluation to another student
+     */
+    async function duplicateEvaluation() {
+      try {
+        // Get current form data
+        const instrument = evaluationData.instrumentDetails;
+        let currentData;
+
+        if (instrument.tipo === 'Rúbrica') {
+          currentData = collectRubricData();
+        } else if (instrument.tipo === 'Lista de Cotejo') {
+          currentData = collectChecklistData();
+        } else if (instrument.tipo === 'Calificación Directa') {
+          currentData = collectDirectGradeData();
+        }
+
+        if (!currentData) {
+          showError('Por favor, completa la evaluación antes de duplicar');
+          return;
+        }
+
+        // Get students not currently selected
+        const availableStudents = evaluationData.allStudents.filter(
+          s => !evaluationData.selectedStudents.some(selected => selected.id === s.id)
+        );
+
+        if (availableStudents.length === 0) {
+          showError('No hay más estudiantes disponibles para duplicar');
+          return;
+        }
+
+        // Create modal for student selection
+        showDuplicateModal(availableStudents, currentData);
+
+      } catch (error) {
+        console.error('Error duplicating evaluation:', error);
+        showError('Error al duplicar evaluación', error.message);
+      }
+    }
+
+    /**
+     * Show modal for duplicating evaluation
+     */
+    function showDuplicateModal(students, evaluationData) {
+      const modal = document.createElement('div');
+      modal.className = 'modal active';
+      modal.id = 'duplicateEvaluationModal';
+      modal.style.zIndex = '1100'; // Higher than evaluation panel (1001)
+
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px; margin: auto;">
+          <div class="modal-header">
+            <h3 class="modal-title">Duplicar Evaluación</h3>
+            <button class="modal-close" onclick="closeModal('duplicateEvaluationModal')">×</button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom: 1rem; color: var(--text-light);">
+              Selecciona el estudiante al que quieres copiar esta evaluación:
+            </p>
+            <div class="form-group">
+              <label class="form-label">Estudiante</label>
+              <select class="form-select" id="duplicateStudentSelect" required>
+                <option value="">Selecciona un estudiante...</option>
+                ${students.map(s => `<option value="${s.id}" data-student='${JSON.stringify(s)}'>${s.nombre}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('duplicateEvaluationModal')">Cancelar</button>
+            <button class="btn btn-primary" onclick="confirmDuplicate()">Duplicar</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Close on outside click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          closeModal('duplicateEvaluationModal');
+        }
+      });
+
+      // Store evaluation data for duplication
+      window.tempDuplicateData = evaluationData;
+    }
+
+    /**
+     * Confirm duplication
+     */
+    async function confirmDuplicate() {
+      const select = document.getElementById('duplicateStudentSelect');
+      const selectedOption = select.options[select.selectedIndex];
+
+      if (!selectedOption || !selectedOption.value) {
+        showError('Por favor, selecciona un estudiante');
+        return;
+      }
+
+      const student = JSON.parse(selectedOption.dataset.student);
+      const evaluationResult = window.tempDuplicateData;
+      const notes = document.getElementById('evaluationNotes')?.value || '';
+
+      try {
+        showLoading('Duplicando evaluación...');
+
+        const dataToSave = {
+          studentId: student.id,
+          studentName: student.nombre,
+          instrumentId: evaluationData.instrumentDetails.id,
+          instrumentName: evaluationData.instrumentDetails.nombre,
+          course: evaluationData.selectedCourse,
+          tipo: evaluationData.instrumentDetails.tipo,
+          resultado: evaluationResult,
+          notes: notes + ' (Duplicado)',
+          fecha: new Date().toISOString()
+        };
+
+        await callBackend('saveEvaluation', dataToSave);
+
+        hideLoading();
+        closeModal('duplicateEvaluationModal');
+        showSuccess(`Evaluación duplicada para ${student.nombre}`);
+
+        // Refresh the student list
+        onEvaluateInstrumentChange();
+
+      } catch (error) {
+        hideLoading();
+        console.error('Error duplicating evaluation:', error);
+        showError('Error al duplicar evaluación', error.message);
+      }
+    }
+
+    /**
+     * View student evaluation (read-only)
+     */
+    async function viewStudentEvaluation(studentId) {
+      try {
+        showLoading('Cargando evaluación...');
+
+        // Get the evaluation details from backend
+        const evaluation = await callBackend('getStudentEvaluation',
+          studentId,
+          evaluationData.instrumentDetails.id
+        );
+
+        hideLoading();
+
+        if (!evaluation) {
+          showError('No se encontró la evaluación');
+          return;
+        }
+
+        // Create modal to show evaluation
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'viewEvaluationModal';
+
+        const student = evaluationData.allStudents.find(s => s.id === studentId);
+        const instrument = evaluationData.instrumentDetails;
+
+        let resultHTML = '';
+
+        if (instrument.tipo === 'Rúbrica') {
+          const criterios = evaluation.resultado.criterios || [];
+          resultHTML = `
+            <div style="margin-top: 1rem;">
+              <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Evaluación de Criterios</h4>
+              ${criterios.map((c, idx) => `
+                <div style="padding: 1rem; background: var(--bg); border-radius: 8px; margin-bottom: 0.75rem; border-left: 4px solid var(--primary);">
+                  <div style="font-weight: 600; margin-bottom: 0.5rem;">${idx + 1}. ${c.criterio}</div>
+                  <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem;">
+                    <div><strong>Nivel:</strong> ${c.nivelNombre || c.nivel}</div>
+                    <div><strong>Puntos:</strong> ${c.puntos}</div>
+                  </div>
+                  ${c.descriptor ? `<div style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px;">${c.descriptor}</div>` : ''}
+                </div>
+              `).join('')}
+              <div style="padding: 1rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-top: 1rem; text-align: center;">
+                <strong style="font-size: 1.1rem; color: var(--primary);">Calificación Total: ${evaluation.resultado.calificacion || evaluation.resultado.puntosTotales} puntos</strong>
+              </div>
+            </div>
+          `;
+        } else if (instrument.tipo === 'Lista de Cotejo') {
+          const items = evaluation.resultado.items || [];
+          resultHTML = `
+            <div style="margin-top: 1rem;">
+              <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Elementos Evaluados</h4>
+              ${items.map((item, idx) => `
+                <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                  <span style="font-size: 1.2rem;">${item.completado ? '✅' : '❌'}</span>
+                  <span>${item.item}</span>
+                </div>
+              `).join('')}
+              <div style="padding: 1rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-top: 1rem; text-align: center;">
+                <strong style="font-size: 1.1rem; color: var(--primary);">
+                  ${evaluation.resultado.completados} de ${evaluation.resultado.total} completados (${evaluation.resultado.porcentaje}%)
+                </strong>
+              </div>
+            </div>
+          `;
+        } else if (instrument.tipo === 'Calificación Directa') {
+          resultHTML = `
+            <div style="margin-top: 1rem;">
+              <div style="padding: 2rem; background: rgba(37, 99, 235, 0.1); border-radius: 8px; text-align: center;">
+                <div style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.5rem;">Calificación</div>
+                <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary);">${evaluation.resultado.calificacion}</div>
+                <div style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.5rem;">sobre 10</div>
+              </div>
+            </div>
+          `;
+        }
+
+        modal.innerHTML = `
+          <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+              <div>
+                <h3 class="modal-title" style="margin-bottom: 0.25rem;">📋 Evaluación Registrada</h3>
+                <p style="font-size: 0.875rem; color: var(--text-light); margin: 0;">${student?.nombre || 'Estudiante'}</p>
+              </div>
+              <button class="modal-close" onclick="closeModal('viewEvaluationModal')">×</button>
+            </div>
+            <div class="modal-body">
+              <div style="padding: 1rem; background: var(--bg); border-radius: 8px; margin-bottom: 1rem;">
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; font-size: 0.9rem;">
+                  <strong>Instrumento:</strong>
+                  <span>${instrument.nombre}</span>
+                  <strong>Tipo:</strong>
+                  <span>${instrument.tipo}</span>
+                  <strong>Curso:</strong>
+                  <span>${evaluationData.selectedCourse}</span>
+                  <strong>Fecha:</strong>
+                  <span>${new Date(evaluation.fecha).toLocaleString('es-ES')}</span>
+                </div>
+              </div>
+
+              ${resultHTML}
+
+              ${evaluation.notes ? `
+                <div style="margin-top: 1rem;">
+                  <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem;">Observaciones</h4>
+                  <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px; font-size: 0.9rem; color: var(--text-light);">
+                    ${evaluation.notes}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline" onclick="closeModal('viewEvaluationModal')">Cerrar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close on outside click
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            closeModal('viewEvaluationModal');
+          }
+        });
+
+      } catch (error) {
+        hideLoading();
+        console.error('Error viewing evaluation:', error);
+        showError('Error al cargar la evaluación', error.message);
+      }
+    }
+
+    // ============================================================================
+    // END EVALUATION SECTION
+    // ============================================================================
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {

@@ -134,7 +134,10 @@ function doPost(e) {
       // Sistema de alertas
       'diagnosticarSistemaAlertas': diagnosticarSistemaAlertas,
       'openSchedulerDialog': openSchedulerDialog,
-      'openConfigDialog': openConfigDialog
+      'openConfigDialog': openConfigDialog,
+
+      // Evaluación
+      'getInstrumentDetails': getInstrumentDetails
     };
 
     // Verificar si la función existe en el mapa
@@ -702,11 +705,32 @@ function onOpen() {
         .addItem('🔍 Diagnosticar sistema', 'diagnosticarSistemaAlertas')
     )
 
+    // --- SECCIÓN RECURSOS EXTERNOS ---
+    .addSubMenu(
+      ui.createMenu('🔗 Recursos Externos')
+        .addItem('🌐 Abrir herramienta externa', 'abrirEnlaceExterno')
+    )
+
     .addToUi();
 
   // ★ EJECUTAR ANÁLISIS AUTOMÁTICO AL ABRIR (si está activado en configuración)
   // Se ejecuta en segundo plano sin bloquear la interfaz
   checkAttendanceOnOpen();
+}
+
+/****************************************************************
+ *  FUNCIÓN PARA ABRIR ENLACE EXTERNO                          *
+ ****************************************************************/
+/**
+ * Abre un enlace externo en una nueva pestaña del navegador
+ */
+function abrirEnlaceExterno() {
+  const url = 'https://script.google.com/a/macros/scorazon.hhdc.net/s/AKfycbysSeb9LlsIQ48K5LemLoPh8a_5BaiLXKp7hSd7HOG7nQwWP3NVn7NMwAKTG9nnmCfD/exec';
+  const html = '<script>window.open("' + url + '", "_blank");google.script.host.close();</script>';
+  const ui = HtmlService.createHtmlOutput(html)
+    .setWidth(100)
+    .setHeight(10);
+  SpreadsheetApp.getUi().showModalDialog(ui, 'Abriendo enlace...');
 }
 
 /****************************************************************
@@ -1082,14 +1106,33 @@ function recordRubricaGrade(formData) {
     const cursoEval = estudiante.Curso || estudiante.CursoEvaluado || estudiante.CursoID || '';
     const nombreSitu = instrumento.NombreSituacion || getNombreSituacion(ss, instrumento);
 
+    const { headers: defH, values: defV } = getSheetData(ss, 'Definicion_Rubricas');
+    const rubricaId = instrumento.IDInstrumentoTipo;
+    const iDescDef = idx(defH, ['Descriptor', 'Descripcion', 'Descripción']);
+
+    // Crear mapa de descriptores por criterio+nivel
+    const descriptoresMap = {};
+    defV.filter(r => r[defH.indexOf('IDRubrica')] === rubricaId).forEach(r => {
+      const criterioId = r[defH.indexOf('IDCriterio')];
+      const nivelId = r[defH.indexOf('IDNivel')];
+      const key = `${criterioId}|${nivelId}`;
+      descriptoresMap[key] = r[iDescDef] || '';
+    });
+
     const criteriosConPunt = formData.criterios.map(c => {
       const nivelInfo = getNivelInfo(ss, c.nivelID);
-      return { criterioID: c.criterioID, nivelID: c.nivelID, nombreNivel: nivelInfo.NombreNivel, puntuacion: nivelInfo.PuntuacionNivel };
+      const key = `${c.criterioID}|${c.nivelID}`;
+      const descriptor = descriptoresMap[key] || '';
+      return {
+        criterioID: c.criterioID,
+        nivelID: c.nivelID,
+        nombreNivel: nivelInfo.NombreNivel,
+        puntuacion: nivelInfo.PuntuacionNivel,
+        descriptor: descriptor
+      };
     });
     const puntuado = criteriosConPunt.reduce((sum, c) => sum + c.puntuacion, 0);
 
-    const { headers: defH, values: defV } = getSheetData(ss, 'Definicion_Rubricas');
-    const rubricaId = instrumento.IDInstrumentoTipo;
     const todasPunts = defV
       .filter(r => r[defH.indexOf('IDRubrica')] === rubricaId)
       .map(r => getNivelInfo(ss, r[defH.indexOf('IDNivel')]).PuntuacionNivel);
@@ -1106,7 +1149,7 @@ function recordRubricaGrade(formData) {
       const newRow = [
         idDet, idMae, instrumento.NombreInstrumento, '',
         estudiante.NombreEstudiante, cursoEval, nombreSitu, fecha,
-        nombreCrit, c.nombreNivel, c.puntuacion, '', '',
+        nombreCrit, c.nombreNivel, c.puntuacion, c.descriptor, '',
         calTotal.toFixed(2), formData.comments || '', ''
       ];
       sheet.appendRow(newRow);
@@ -1186,22 +1229,39 @@ function recordRubricaPeerGrade(formData) {
     if (!evaluado)  throw new Error('Evaluado no encontrado: '  + formData.evaluadoId);
 
     const fecha      = new Date();
+    const cursoEval = evaluado.Curso || evaluado.CursoEvaluado || evaluado.CursoID || '';
+    const nombreSitu = instrumento.NombreSituacion || getNombreSituacion(ss, instrumento);
+
+    // Cargar descriptores desde Definicion_Rubricas
+    const { headers: defH, values: defV } = getSheetData(ss, 'Definicion_Rubricas');
+    const rubricaId = instrumento.IDInstrumentoTipo;
+    const iDescDef = idx(defH, ['Descriptor', 'Descripcion', 'Descripción']);
+
+    // Crear mapa de descriptores por criterio+nivel
+    const descriptoresMap = {};
+    defV.filter(r => r[defH.indexOf('IDRubrica')] === rubricaId).forEach(r => {
+      const criterioId = r[defH.indexOf('IDCriterio')];
+      const nivelId = r[defH.indexOf('IDNivel')];
+      const key = `${criterioId}|${nivelId}`;
+      descriptoresMap[key] = r[iDescDef] || '';
+    });
+
     const puntuado   = formData.criterios.reduce((sum, c) => sum + (c.puntuacion || 0), 0);
     const maxPunt    = formData.rubricaMaxPuntuacionPosible || 100;
     const calTotal   = (puntuado / maxPunt) * 10;
 
-    const cursoEval = evaluado.Curso || evaluado.CursoEvaluado || evaluado.CursoID || '';
-    const nombreSitu = instrumento.NombreSituacion || getNombreSituacion(ss, instrumento);
-
     formData.criterios.forEach(criterio => {
       const nombreCrit = getCriterioNombre(ss, criterio.criterioID);
       const nivelInfo  = getNivelInfo(ss, criterio.nivelID);
+      const key = `${criterio.criterioID}|${criterio.nivelID}`;
+      const descriptor = descriptoresMap[key] || '';
+
       const newRow = [
         idDet, idMae, instrumento.NombreInstrumento,
         evaluador.NombreEstudiante, evaluado.NombreEstudiante,
         cursoEval, nombreSitu, fecha,
         nombreCrit, nivelInfo.NombreNivel, criterio.puntuacion,
-        '', '', calTotal.toFixed(2), formData.comments || '', ''
+        descriptor, '', calTotal.toFixed(2), formData.comments || '', ''
       ];
       sheet.appendRow(newRow);
     });
@@ -2415,324 +2475,533 @@ function reporteAsistenciaAvanzada_UI() {
  */
 function listarReportesExistentes() {
   try {
-    // Validar que SPREADSHEET_ID esté configurado
+    Logger.log('=== INICIO listarReportesExistentes (Versión Mejorada) ===');
+    Logger.log('Timestamp: ' + new Date().toISOString());
+
+    // ========================================
+    // 1. VALIDACIÓN DE SPREADSHEET_ID
+    // ========================================
     if (!SPREADSHEET_ID || SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
-      Logger.log('ERROR: SPREADSHEET_ID no está configurado correctamente');
+      Logger.log('❌ ERROR: SPREADSHEET_ID no está configurado correctamente');
       return {
         success: false,
-        message: 'Error de configuración: SPREADSHEET_ID no está definido. Por favor, configura el ID de tu hoja de cálculo en Code.gs'
+        message: 'Error de configuración: SPREADSHEET_ID no está definido',
+        data: []
       };
     }
 
-    Logger.log('=== INICIO listarReportesExistentes ===');
-    Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
+    Logger.log('✓ SPREADSHEET_ID configurado: ' + SPREADSHEET_ID);
 
+    // ========================================
+    // 2. ACCESO AL SPREADSHEET
+    // ========================================
     let ss;
     let metodoAcceso = '';
 
     try {
-      Logger.log('Método 1: Intentando SpreadsheetApp.openById...');
+      Logger.log('Intentando abrir spreadsheet con openById...');
       ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       metodoAcceso = 'openById';
-      Logger.log('✓ Éxito con openById');
+      Logger.log('✓ Spreadsheet abierto con openById');
     } catch (ssError) {
-      Logger.log('✖ Falló openById: ' + ssError.message);
-      Logger.log('Stack: ' + (ssError.stack || 'N/A'));
+      Logger.log('❌ Error con openById: ' + ssError.message);
 
-      // Intentar con el spreadsheet activo como fallback
+      // Fallback: intentar con getActiveSpreadsheet
       try {
-        Logger.log('Método 2: Intentando SpreadsheetApp.getActiveSpreadsheet...');
+        Logger.log('Intentando con getActiveSpreadsheet...');
         ss = SpreadsheetApp.getActiveSpreadsheet();
         metodoAcceso = 'getActiveSpreadsheet';
-        Logger.log('✓ Éxito con getActiveSpreadsheet');
+        Logger.log('✓ Spreadsheet abierto con getActiveSpreadsheet');
       } catch (activeError) {
-        Logger.log('✖ Falló getActiveSpreadsheet: ' + activeError.message);
-        Logger.log('Stack: ' + (activeError.stack || 'N/A'));
-
+        Logger.log('❌ Error con getActiveSpreadsheet: ' + activeError.message);
         return {
           success: false,
-          message: 'No se puede acceder al spreadsheet. Error original: ' + ssError.message + '. Error fallback: ' + activeError.message
+          message: 'No se puede acceder al spreadsheet. Verifica permisos.',
+          data: []
         };
       }
     }
 
-    Logger.log('Spreadsheet abierto con método: ' + metodoAcceso);
+    Logger.log('Método de acceso: ' + metodoAcceso);
     Logger.log('Spreadsheet ID real: ' + ss.getId());
     Logger.log('Spreadsheet nombre: ' + ss.getName());
 
+    // ========================================
+    // 3. OBTENER TODAS LAS HOJAS
+    // ========================================
     let sheets;
     try {
       sheets = ss.getSheets();
       Logger.log('✓ Total de hojas obtenidas: ' + sheets.length);
     } catch (sheetError) {
-      Logger.log('✖ Error al obtener hojas: ' + sheetError.message);
+      Logger.log('❌ Error al obtener hojas: ' + sheetError.message);
       return {
         success: false,
-        message: 'Error al obtener hojas del spreadsheet: ' + sheetError.message
+        message: 'Error al obtener hojas del spreadsheet: ' + sheetError.message,
+        data: []
       };
     }
 
-    // Usar fecha actual para evitar problemas de permisos con DriveApp
+    // Si no hay hojas, retornar array vacío pero con éxito
+    if (!sheets || sheets.length === 0) {
+      Logger.log('⚠️ No se encontraron hojas en el spreadsheet');
+      return {
+        success: true,
+        message: 'El spreadsheet no contiene hojas',
+        data: []
+      };
+    }
+
+    // ========================================
+    // 4. FILTRAR Y PROCESAR REPORTES
+    // ========================================
+    const reportes = [];
     const ultimaModificacion = new Date();
 
-    const reportes = [];
-
-    // Lista de hojas principales del sistema a ignorar
+    // Hojas del sistema a ignorar
     const hojasPrincipales = [
-      'Estudiantes', 'InstrumentosEvaluacion', 'SituacionesAprendizaje',
-      'CalificacionesDetalladas', 'RegistroAsistencia', 'Maestro_CriteriosRubrica',
-      'Maestro_NivelesRubrica', 'Definicion_Rubricas', 'Definicion_ListasCotejo',
-      'ConfiguracionAlertas', 'Scheduler'
+      'Estudiantes',
+      'InstrumentosEvaluacion',
+      'SituacionesAprendizaje',
+      'CalificacionesDetalladas',
+      'RegistroAsistencia',
+      'Maestro_CriteriosRubrica',
+      'Maestro_NivelesRubrica',
+      'Definicion_Rubricas',
+      'Definicion_ListasCotejo',
+      'ConfiguracionAlertas',
+      'Scheduler'
     ];
 
-    sheets.forEach(sheet => {
-      const nombre = sheet.getName();
+    Logger.log('Procesando hojas...');
 
-      // Ignorar hojas principales del sistema
-      if (hojasPrincipales.includes(nombre)) {
-        Logger.log('⏭️ Ignorando hoja del sistema: ' + nombre);
-        return;
-      }
+    sheets.forEach((sheet, index) => {
+      try {
+        const nombre = sheet.getName();
 
-      let tipo = null;
-      let subtipo = null;
-      let info = {};
-
-      Logger.log('Analizando hoja: "' + nombre + '"');
-
-      // ========================================
-      // 📊 REPORTES DE NOTAS POR SITUACIÓN
-      // ========================================
-
-      // 1. Reportes de notas por situación (formato: "RepNotas CURSO-SITUACION")
-      if (nombre.startsWith('RepNotas ')) {
-        Logger.log('  ✓ Coincide con patrón RepNotas');
-        tipo = 'notas';
-        subtipo = 'situacion';
-        const resto = nombre.substring(9); // Quitar "RepNotas "
-        const partes = resto.split('-');
-        if (partes.length >= 2) {
-          info = {
-            curso: partes[0].trim(),
-            situacion: partes.slice(1).join('-').trim(), // Por si la situación tiene guiones
-            descripcion: `Notas de ${partes[0].trim()} - ${partes.slice(1).join('-').trim()}`
-          };
-        } else {
-          info = {
-            descripcion: resto || 'Reporte de notas'
-          };
+        // Ignorar hojas del sistema
+        if (hojasPrincipales.includes(nombre)) {
+          Logger.log(`  [${index + 1}/${sheets.length}] ⏭️ Ignorando hoja del sistema: "${nombre}"`);
+          return;
         }
-      }
 
-      // ========================================
-      // 📈 REPORTES DE CALIFICACIONES
-      // ========================================
+        Logger.log(`  [${index + 1}/${sheets.length}] Analizando: "${nombre}"`);
 
-      // 2. Reportes de calificaciones por estudiante
-      else if (nombre === 'Reporte_Calif_Estudiante') {
-        tipo = 'calificaciones';
-        subtipo = 'estudiante';
-        info = { descripcion: 'Calificaciones por estudiante' };
-      }
+        let tipo = null;
+        let subtipo = null;
+        let info = {};
 
-      // 3. Reportes de calificaciones por curso
-      else if (nombre === 'Reporte_Calif_Curso') {
-        tipo = 'calificaciones';
-        subtipo = 'curso';
-        info = { descripcion: 'Calificaciones por curso' };
-      }
+        // ========================================
+        // PATRONES DE REPORTES
+        // ========================================
 
-      // 4. Reportes generales de calificaciones
-      else if (nombre === 'Reporte_Calificaciones') {
-        tipo = 'calificaciones';
-        subtipo = 'general';
-        info = { descripcion: 'Reporte general de calificaciones' };
-      }
+        // 1. RepNotas {curso}-{situacion}
+        if (nombre.startsWith('RepNotas ')) {
+          tipo = 'notas';
+          subtipo = 'situacion';
+          const resto = nombre.substring(9); // Quitar "RepNotas "
+          const partes = resto.split('-');
 
-      // ========================================
-      // 📋 REPORTES DE ASISTENCIA
-      // ========================================
+          if (partes.length >= 2) {
+            info = {
+              curso: partes[0].trim(),
+              situacion: partes.slice(1).join('-').trim(),
+              descripcion: `Notas de ${partes[0].trim()} - ${partes.slice(1).join('-').trim()}`
+            };
+            Logger.log(`    ✓ Tipo: notas/situacion - Curso: ${info.curso}, Situación: ${info.situacion}`);
+          } else {
+            info = { descripcion: resto || 'Reporte de notas' };
+            Logger.log(`    ✓ Tipo: notas/situacion - Descripción genérica`);
+          }
+        }
 
-      // 1. Reportes avanzados de asistencia
-      else if (nombre === 'Reporte_Asistencia_Av') {
-        tipo = 'asistencia';
-        subtipo = 'avanzado';
-        info = { descripcion: 'Reporte avanzado de asistencia por curso' };
-      }
-      else if (nombre === 'Reporte_Asistencia_Av_Diario') {
-        tipo = 'asistencia';
-        subtipo = 'avanzado_diario';
-        info = { descripcion: 'Reporte consolidado diario de asistencia' };
-      }
-      else if (nombre === 'Reporte_Avanzado_Asistencia') {
-        tipo = 'asistencia';
-        subtipo = 'avanzado';
-        info = { descripcion: 'Reporte avanzado con estadísticas' };
-      }
+        // 2. Reportes de Calificaciones
+        else if (nombre === 'Reporte_Calif_Estudiante') {
+          tipo = 'calificaciones';
+          subtipo = 'estudiante';
+          info = { descripcion: 'Calificaciones por estudiante' };
+          Logger.log(`    ✓ Tipo: calificaciones/estudiante`);
+        }
+        else if (nombre === 'Reporte_Calif_Curso') {
+          tipo = 'calificaciones';
+          subtipo = 'curso';
+          info = { descripcion: 'Calificaciones por curso' };
+          Logger.log(`    ✓ Tipo: calificaciones/curso`);
+        }
+        else if (nombre === 'Reporte_Calificaciones') {
+          tipo = 'calificaciones';
+          subtipo = 'general';
+          info = { descripcion: 'Reporte general de calificaciones' };
+          Logger.log(`    ✓ Tipo: calificaciones/general`);
+        }
 
-      // 2. Reportes de asistencia con fecha o sufijo
-      else if (nombre.startsWith('Reporte_Asistencia_') &&
-               nombre !== 'Reporte_Asistencia_Av' &&
-               nombre !== 'Reporte_Asistencia_Av_Diario') {
-        tipo = 'asistencia';
-        subtipo = 'fecha';
-        const sufijo = nombre.substring(19); // Quitar "Reporte_Asistencia_"
-        info = {
-          fecha: sufijo,
-          descripcion: `Asistencia - ${sufijo}`
-        };
-      }
+        // 3. Reportes de Asistencia
+        else if (nombre === 'Reporte_Asistencia_Av') {
+          tipo = 'asistencia';
+          subtipo = 'avanzado';
+          info = { descripcion: 'Reporte avanzado de asistencia por curso' };
+          Logger.log(`    ✓ Tipo: asistencia/avanzado`);
+        }
+        else if (nombre === 'Reporte_Asistencia_Av_Diario') {
+          tipo = 'asistencia';
+          subtipo = 'avanzado_diario';
+          info = { descripcion: 'Reporte consolidado diario de asistencia' };
+          Logger.log(`    ✓ Tipo: asistencia/avanzado_diario`);
+        }
+        else if (nombre === 'Reporte_Avanzado_Asistencia') {
+          tipo = 'asistencia';
+          subtipo = 'avanzado';
+          info = { descripcion: 'Reporte avanzado con estadísticas' };
+          Logger.log(`    ✓ Tipo: asistencia/avanzado`);
+        }
+        else if (nombre.startsWith('Reporte_Asistencia_') &&
+                 nombre !== 'Reporte_Asistencia_Av' &&
+                 nombre !== 'Reporte_Asistencia_Av_Diario') {
+          tipo = 'asistencia';
+          subtipo = 'fecha';
+          const sufijo = nombre.substring(19);
+          info = {
+            fecha: sufijo,
+            descripcion: `Asistencia - ${sufijo}`
+          };
+          Logger.log(`    ✓ Tipo: asistencia/fecha - ${sufijo}`);
+        }
+        else if (nombre === 'Reporte_Asistencia') {
+          tipo = 'asistencia';
+          subtipo = 'simple';
+          info = { descripcion: 'Reporte general de asistencia' };
+          Logger.log(`    ✓ Tipo: asistencia/simple`);
+        }
 
-      // 3. Reporte de asistencia simple
-      else if (nombre === 'Reporte_Asistencia') {
-        tipo = 'asistencia';
-        subtipo = 'simple';
-        info = { descripcion: 'Reporte general de asistencia' };
-      }
+        // 4. Comparativas
+        else if (nombre === 'Comparativa_Estudiantes') {
+          tipo = 'comparativa';
+          subtipo = 'estudiantes_asistencia';
+          info = { descripcion: 'Comparativa de asistencia entre estudiantes' };
+          Logger.log(`    ✓ Tipo: comparativa/estudiantes_asistencia`);
+        }
+        else if (nombre === 'Comparativa_Cursos') {
+          tipo = 'comparativa';
+          subtipo = 'cursos_asistencia';
+          info = { descripcion: 'Comparativa de asistencia entre cursos' };
+          Logger.log(`    ✓ Tipo: comparativa/cursos_asistencia`);
+        }
+        else if (nombre === 'Comparativa_Calificaciones_Estudiantes' || nombre === 'Comparativa_Calif_Est') {
+          tipo = 'comparativa';
+          subtipo = 'estudiantes_calificaciones';
+          info = { descripcion: 'Comparativa de calificaciones entre estudiantes' };
+          Logger.log(`    ✓ Tipo: comparativa/estudiantes_calificaciones`);
+        }
+        else if (nombre === 'Comparativa_Calificaciones_Cursos' || nombre === 'Comparativa_Calif_Cursos') {
+          tipo = 'comparativa';
+          subtipo = 'cursos_calificaciones';
+          info = { descripcion: 'Comparativa de calificaciones entre cursos' };
+          Logger.log(`    ✓ Tipo: comparativa/cursos_calificaciones`);
+        }
 
-      // ========================================
-      // 🔄 COMPARATIVAS
-      // ========================================
+        // 5. Diagnóstico
+        else if (nombre === 'Diagnostico_Sistema') {
+          tipo = 'diagnostico';
+          subtipo = 'sistema';
+          info = { descripcion: 'Diagnóstico del sistema de alertas' };
+          Logger.log(`    ✓ Tipo: diagnostico/sistema`);
+        }
 
-      // 1. Comparativas de asistencia entre estudiantes
-      else if (nombre === 'Comparativa_Estudiantes') {
-        tipo = 'comparativa';
-        subtipo = 'estudiantes_asistencia';
-        info = { descripcion: 'Comparativa de asistencia entre estudiantes' };
-      }
+        // Si se identificó como reporte, agregarlo
+        if (tipo) {
+          reportes.push({
+            nombre: nombre,
+            tipo: tipo,
+            subtipo: subtipo,
+            info: info,
+            ultimaModificacion: ultimaModificacion.toISOString()
+          });
+          Logger.log(`    ✅ AGREGADO: ${nombre} [${tipo}/${subtipo}]`);
+        } else {
+          Logger.log(`    ⏭️ No es un reporte conocido: "${nombre}"`);
+        }
 
-      // 2. Comparativas de asistencia entre cursos
-      else if (nombre === 'Comparativa_Cursos') {
-        tipo = 'comparativa';
-        subtipo = 'cursos_asistencia';
-        info = { descripcion: 'Comparativa de asistencia entre cursos' };
-      }
-
-      // 3. Comparativas de calificaciones por estudiantes
-      else if (nombre === 'Comparativa_Calificaciones_Estudiantes' || nombre === 'Comparativa_Calif_Est') {
-        tipo = 'comparativa';
-        subtipo = 'estudiantes_calificaciones';
-        info = { descripcion: 'Comparativa de calificaciones entre estudiantes' };
-      }
-
-      // 4. Comparativas de calificaciones por cursos
-      else if (nombre === 'Comparativa_Calificaciones_Cursos' || nombre === 'Comparativa_Calif_Cursos') {
-        tipo = 'comparativa';
-        subtipo = 'cursos_calificaciones';
-        info = { descripcion: 'Comparativa de calificaciones entre cursos' };
-      }
-
-      // ========================================
-      // 🔧 DIAGNÓSTICO
-      // ========================================
-
-      else if (nombre === 'Diagnostico_Sistema') {
-        tipo = 'diagnostico';
-        subtipo = 'sistema';
-        info = { descripcion: 'Diagnóstico del sistema de alertas' };
-      }
-
-      // Solo añadir si se identificó como un reporte
-      if (tipo) {
-        reportes.push({
-          nombre: nombre,
-          tipo: tipo,
-          subtipo: subtipo,
-          info: info,
-          ultimaModificacion: ultimaModificacion
-        });
-        Logger.log(`✅ Añadido: ${nombre} [${tipo}/${subtipo}]`);
-      } else {
-        Logger.log('⏭️ Ignorando hoja no-reporte: ' + nombre);
+      } catch (sheetProcessError) {
+        Logger.log(`    ❌ Error procesando hoja: ${sheetProcessError.message}`);
       }
     });
 
+    // ========================================
+    // 5. ORDENAR Y RETORNAR
+    // ========================================
+    Logger.log('');
     Logger.log('Total de reportes identificados: ' + reportes.length);
 
-    // Ordenar por nombre (alfabéticamente) ya que todos tienen la misma fecha
+    // Ordenar alfabéticamente por nombre
     try {
       reportes.sort((a, b) => {
         const nombreA = a.nombre || '';
         const nombreB = b.nombre || '';
         return nombreA.localeCompare(nombreB);
       });
-      Logger.log('✓ Reportes ordenados correctamente');
+      Logger.log('✓ Reportes ordenados alfabéticamente');
     } catch (sortError) {
       Logger.log('⚠️ Error al ordenar reportes: ' + sortError.message);
     }
 
-    // Intentar loggear los nombres de reportes de forma segura
-    try {
-      const nombres = reportes.map(r => r.nombre || '(sin nombre)').join(', ');
-      Logger.log('Reportes encontrados: ' + nombres);
-    } catch (logError) {
-      Logger.log('⚠️ No se pudo loggear nombres de reportes: ' + logError.message);
+    // Log de nombres de reportes
+    if (reportes.length > 0) {
+      Logger.log('Reportes encontrados:');
+      reportes.forEach((r, i) => {
+        Logger.log(`  ${i + 1}. ${r.nombre} [${r.tipo}/${r.subtipo}]`);
+      });
+    } else {
+      Logger.log('⚠️ No se encontraron reportes que coincidan con los patrones');
     }
 
-    Logger.log('=== FIN listarReportesExistentes - Retornando éxito con ' + reportes.length + ' reportes ===');
+    Logger.log('=== FIN listarReportesExistentes - SUCCESS ===');
+    Logger.log('');
 
+    // IMPORTANTE: Retornar con estructura correcta
     return {
       success: true,
-      data: reportes
+      data: reportes,
+      message: reportes.length === 0 ? 'No se encontraron reportes' : `Se encontraron ${reportes.length} reportes`
     };
 
   } catch (error) {
-    const errorMsg = 'Error en listarReportesExistentes: ' + error.toString() +
-                     ' | Stack: ' + (error.stack || 'No disponible');
-    Logger.log(errorMsg);
+    const errorMsg = 'Error en listarReportesExistentes: ' + error.toString();
+    const stackMsg = error.stack || 'No disponible';
+
+    Logger.log('=== ERROR en listarReportesExistentes ===');
+    Logger.log('Mensaje: ' + errorMsg);
+    Logger.log('Stack: ' + stackMsg);
+    Logger.log('========================================');
+
     return {
       success: false,
-      message: 'Error al obtener reportes: ' + error.message + '. Revisa la consola de Apps Script para más detalles.'
+      message: 'Error al obtener reportes: ' + error.message,
+      data: []
     };
   }
 }
-
 /**
  * Lee los datos de un reporte existente por nombre de hoja
  */
 function leerReporteExistente(nombreHoja) {
   try {
+    Logger.log(`[leerReporteExistente] Iniciando lectura de: "${nombreHoja}"`);
+
     if (!nombreHoja) {
+      Logger.log('[leerReporteExistente] ERROR: Nombre de hoja vacío');
       return { success: false, message: 'Debe especificar el nombre de la hoja' };
     }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(nombreHoja);
+
+    // Normalizar espacios en el nombre
+    const nombreNormalizado = nombreHoja.trim();
+    const sheet = ss.getSheetByName(nombreNormalizado);
 
     if (!sheet) {
-      return { success: false, message: 'No se encontró la hoja "' + nombreHoja + '"' };
+      Logger.log(`[leerReporteExistente] ERROR: Hoja no encontrada: "${nombreNormalizado}"`);
+      return {
+        success: false,
+        message: `No se encontró la hoja "${nombreNormalizado}". Verifica el nombre exacto (mayúsculas/minúsculas).`
+      };
     }
 
-    const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
+    Logger.log(`[leerReporteExistente] Hoja encontrada: "${sheet.getName()}"`);
 
-    if (lastRow < 2) {
-      return { success: false, message: 'La hoja no contiene datos' };
+    // Usar getDataRange() para evitar truncamientos
+    const dataRange = sheet.getDataRange();
+    const allValues = dataRange.getValues();
+
+    if (allValues.length < 1) {
+      Logger.log('[leerReporteExistente] ERROR: Hoja completamente vacía');
+      return {
+        success: false,
+        message: `El reporte "${nombreNormalizado}" está vacío (no hay ni headers).`
+      };
     }
 
-    // Leer encabezados y datos
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    // ========================================
+    // DETECCIÓN ESPECIAL: Reportes de Notas con Medias Ponderadas
+    // ========================================
+    // Los reportes de notas tienen una estructura en dos secciones:
+    // 1. Columnas A-D: Datos originales (Estudiante, Instrumento, Fecha, Calificación)
+    // 2. Columnas F+: Tabla de medias ponderadas (Estudiante, Instrumentos..., Media Ponderada)
 
-    // Convertir a objetos
-    const data = values.map(row => {
+    const isRepNotas = nombreNormalizado.startsWith('RepNotas ');
+
+    if (isRepNotas) {
+      Logger.log('[leerReporteExistente] Detectado: Reporte de Notas - Buscando tabla de medias ponderadas');
+
+      // Buscar la columna que contiene "Estudiante" en la fila 1 (puede estar en F o posterior)
+      // Esta es la tabla de medias ponderadas
+      let mediasStartCol = -1;
+      for (let col = 4; col < allValues[0].length; col++) { // Empezar desde columna E (índice 4)
+        const cellValue = String(allValues[0][col] || '').trim();
+        if (cellValue === 'Estudiante') {
+          mediasStartCol = col;
+          Logger.log(`[leerReporteExistente] Tabla de medias encontrada en columna ${col + 1} (${String.fromCharCode(65 + col)})`);
+          break;
+        }
+      }
+
+      if (mediasStartCol > 0) {
+        // Extraer headers de la tabla de medias (desde mediasStartCol hasta el final)
+        const mediasHeaders = [];
+        for (let col = mediasStartCol; col < allValues[0].length; col++) {
+          const header = String(allValues[0][col] || '').trim();
+          if (header) {
+            mediasHeaders.push(header);
+          }
+        }
+
+        Logger.log(`[leerReporteExistente] Headers de medias ponderadas: ${mediasHeaders.join(', ')}`);
+
+        // Saltar fila 2 (contiene "Peso") y procesar desde fila 3
+        const mediasDataRows = allValues.slice(2).filter(row => {
+          // Filtrar filas vacías
+          const firstCell = row[mediasStartCol];
+          return firstCell !== '' && firstCell !== null && firstCell !== undefined;
+        });
+
+        Logger.log(`[leerReporteExistente] Filas de medias ponderadas (filtradas): ${mediasDataRows.length}`);
+
+        // Convertir a objetos
+        const mediasData = mediasDataRows.map(row => {
+          const obj = {};
+          mediasHeaders.forEach((header, index) => {
+            const colIndex = mediasStartCol + index;
+            const value = colIndex < row.length ? row[colIndex] : '';
+            obj[header] = value;
+          });
+          return obj;
+        });
+
+        // Obtener última modificación
+        let lastModified;
+        try {
+          lastModified = ss.getLastUpdated().toISOString();
+        } catch (e) {
+          lastModified = new Date().toISOString();
+        }
+
+        Logger.log(`[leerReporteExistente] ÉXITO (RepNotas con medias): ${mediasData.length} registros leídos`);
+
+        return {
+          success: true,
+          data: mediasData,
+          headers: mediasHeaders,
+          sheetName: nombreNormalizado,
+          rowCount: mediasData.length,
+          colCount: mediasHeaders.length,
+          lastModified: lastModified,
+          tipoReporte: 'RepNotas_MediasPonderadas'
+        };
+      } else {
+        Logger.log('[leerReporteExistente] No se encontró tabla de medias ponderadas, procesando como reporte simple');
+        // Si no hay tabla de medias, procesar la tabla original (columnas A-D)
+      }
+    }
+
+    // ========================================
+    // PROCESAMIENTO ESTÁNDAR (todos los demás reportes)
+    // ========================================
+
+    // Headers: primera fila, limpiados
+    const headers = allValues[0].map(h => String(h || '').trim()).filter(h => h !== '');
+
+    if (headers.length === 0) {
+      Logger.log('[leerReporteExistente] ERROR: No hay headers válidos');
+      return {
+        success: false,
+        message: `El reporte "${nombreNormalizado}" no tiene headers válidos en la primera fila.`
+      };
+    }
+
+    Logger.log(`[leerReporteExistente] Headers encontrados: ${headers.length} columnas`);
+    Logger.log(`[leerReporteExistente] Headers: ${headers.join(', ')}`);
+
+    if (allValues.length < 2) {
+      Logger.log('[leerReporteExistente] ADVERTENCIA: Solo headers, sin datos');
+      return {
+        success: true,
+        data: [],
+        headers: headers,
+        sheetName: nombreNormalizado,
+        rowCount: 0,
+        colCount: headers.length,
+        lastModified: new Date().toISOString(),
+        message: 'Reporte sin datos (solo headers)'
+      };
+    }
+
+    // Datos: resto de filas, filtrar vacías completamente
+    const dataRows = allValues.slice(1).filter(row => {
+      // Considerar fila vacía si todas las celdas están vacías
+      return row.some(cell => cell !== '' && cell !== null && cell !== undefined);
+    });
+
+    Logger.log(`[leerReporteExistente] Filas de datos (filtradas): ${dataRows.length}`);
+
+    // Convertir a objetos usando los headers
+    const data = dataRows.map((row, rowIndex) => {
       const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = row[index];
+      headers.forEach((header, colIndex) => {
+        // Manejar casos donde la fila es más corta que los headers
+        const value = colIndex < row.length ? row[colIndex] : '';
+        obj[header] = value;
       });
       return obj;
     });
+
+    // Validación opcional de estructura según tipo de reporte
+    // Detectar tipo por nombre de hoja
+    let expectedHeaders = [];
+    if (nombreNormalizado.startsWith('RepNotas ')) {
+      expectedHeaders = ['Estudiante', 'Instrumento', 'Fecha', 'Calificación'];
+    } else if (nombreNormalizado.startsWith('Reporte_Asistencia')) {
+      expectedHeaders = ['Fecha', 'Estudiante', 'Curso'];
+    } else if (nombreNormalizado.startsWith('Comparativa_')) {
+      // Comparativas tienen estructuras variables, no validar
+      expectedHeaders = [];
+    }
+
+    // Validar headers esperados (solo advertencia, no error)
+    if (expectedHeaders.length > 0) {
+      const missing = expectedHeaders.filter(h => !headers.includes(h));
+      if (missing.length > 0) {
+        Logger.log(`[leerReporteExistente] ADVERTENCIA: Headers esperados faltantes: ${missing.join(', ')}`);
+        Logger.log(`[leerReporteExistente] Headers actuales: ${headers.join(', ')}`);
+      }
+    }
+
+    // Obtener última modificación de la hoja
+    let lastModified;
+    try {
+      lastModified = ss.getLastUpdated().toISOString();
+    } catch (e) {
+      lastModified = new Date().toISOString();
+    }
+
+    Logger.log(`[leerReporteExistente] ÉXITO: ${data.length} registros leídos`);
 
     return {
       success: true,
       data: data,
       headers: headers,
-      sheetName: nombreHoja
+      sheetName: nombreNormalizado,
+      rowCount: data.length,
+      colCount: headers.length,
+      lastModified: lastModified
     };
 
   } catch (error) {
-    Logger.log('Error en leerReporteExistente: ' + error);
-    return { success: false, message: 'Error: ' + error.message };
+    Logger.log('[leerReporteExistente] EXCEPCIÓN: ' + error.message);
+    Logger.log('[leerReporteExistente] Stack: ' + error.stack);
+    return {
+      success: false,
+      message: 'Error al leer el reporte: ' + error.message,
+      errorStack: error.stack
+    };
   }
 }
 
@@ -3886,6 +4155,747 @@ function registrarAsistenciaBatch(records) {
     };
   }
 }
+
+/**
+ * ========================================
+ * FUNCIONES DE DIAGNÓSTICO Y PRUEBA
+ * ========================================
+ * Estas funciones ayudan a diagnosticar problemas con la visualización de reportes
+ */
+
+/**
+ * Función de prueba para leerReporteExistente
+ * USO: 1. Copia el nombre EXACTO de un reporte de tu spreadsheet
+ *      2. Reemplaza "TU_NOMBRE_REPORTE" con ese nombre
+ *      3. Ejecuta esta función
+ *      4. Ve a Ver > Registros de ejecución
+ */
+function TEST_leerReporteExistente() {
+  // ⚠️ REEMPLAZA con el nombre real de un reporte en tu spreadsheet
+  const nombreReporte = "RepNotas Curso1BAS-1. Fake News";
+
+  Logger.log('='.repeat(80));
+  Logger.log('🧪 TEST: leerReporteExistente');
+  Logger.log('Reporte: ' + nombreReporte);
+  Logger.log('Timestamp: ' + new Date().toISOString());
+  Logger.log('='.repeat(80));
+
+  try {
+    const resultado = leerReporteExistente(nombreReporte);
+
+    Logger.log('\n📊 RESULTADO:');
+    Logger.log('success: ' + resultado.success);
+
+    if (resultado.success) {
+      Logger.log('✅ ÉXITO - Detalles:');
+      Logger.log('  - sheetName: ' + resultado.sheetName);
+      Logger.log('  - Cantidad de registros: ' + (resultado.data ? resultado.data.length : 'null'));
+      Logger.log('  - Cantidad de columnas: ' + (resultado.headers ? resultado.headers.length : 'null'));
+      Logger.log('\n📋 Headers:');
+      Logger.log(JSON.stringify(resultado.headers, null, 2));
+      Logger.log('\n📄 Primer registro:');
+      Logger.log(JSON.stringify(resultado.data ? resultado.data[0] : null, null, 2));
+      Logger.log('\n📄 Segundo registro:');
+      Logger.log(JSON.stringify(resultado.data ? resultado.data[1] : null, null, 2));
+    } else {
+      Logger.log('❌ ERROR:');
+      Logger.log('message: ' + resultado.message);
+    }
+
+  } catch (error) {
+    Logger.log('❌ EXCEPCIÓN:');
+    Logger.log('Error: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+  }
+
+  Logger.log('='.repeat(80));
+  Logger.log('🧪 FIN TEST');
+  Logger.log('='.repeat(80));
+}
+
+/**
+ * Función de prueba para listarReportesExistentes
+ * USO: 1. Ejecuta esta función
+ *      2. Ve a Ver > Registros de ejecución
+ *      3. Verifica que se listen todos los reportes
+ */
+function TEST_listarReportesExistentes() {
+  Logger.log('='.repeat(80));
+  Logger.log('🧪 TEST: listarReportesExistentes');
+  Logger.log('Timestamp: ' + new Date().toISOString());
+  Logger.log('='.repeat(80));
+
+  try {
+    const resultado = listarReportesExistentes();
+
+    Logger.log('\n📊 RESULTADO:');
+    Logger.log('success: ' + resultado.success);
+
+    if (resultado.success) {
+      Logger.log('✅ ÉXITO - Detalles:');
+      Logger.log('  - Cantidad de reportes: ' + (resultado.data ? resultado.data.length : 'null'));
+
+      Logger.log('\n📋 Lista de Reportes:');
+      if (resultado.data && resultado.data.length > 0) {
+        resultado.data.forEach((reporte, idx) => {
+          Logger.log(`\n${idx + 1}. ${reporte.nombre}`);
+          Logger.log(`   - Tipo: ${reporte.tipo}`);
+          Logger.log(`   - Subtipo: ${reporte.subtipo || 'N/A'}`);
+          Logger.log(`   - Última modificación: ${reporte.ultimaModificacion}`);
+          Logger.log(`   - Info: ${JSON.stringify(reporte.info)}`);
+        });
+      } else {
+        Logger.log('⚠️ No hay reportes');
+      }
+    } else {
+      Logger.log('❌ ERROR:');
+      Logger.log('message: ' + resultado.message);
+    }
+
+  } catch (error) {
+    Logger.log('❌ EXCEPCIÓN:');
+    Logger.log('Error: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+  }
+
+  Logger.log('='.repeat(80));
+  Logger.log('🧪 FIN TEST');
+  Logger.log('='.repeat(80));
+}
+
+/**
+ * Función de diagnóstico completo del sistema de reportes
+ * USO: Ejecuta esta función para obtener un reporte completo del estado del sistema
+ */
+function DIAGNOSTICO_SistemaReportes() {
+  Logger.log('='.repeat(80));
+  Logger.log('🔍 DIAGNÓSTICO COMPLETO DEL SISTEMA DE REPORTES');
+  Logger.log('Timestamp: ' + new Date().toISOString());
+  Logger.log('='.repeat(80));
+
+  try {
+    // 1. Verificar SPREADSHEET_ID
+    Logger.log('\n1️⃣ Verificando SPREADSHEET_ID...');
+    if (!SPREADSHEET_ID || SPREADSHEET_ID === 'TU_SPREADSHEET_ID_AQUI') {
+      Logger.log('❌ SPREADSHEET_ID no está configurado correctamente');
+      return;
+    }
+    Logger.log('✅ SPREADSHEET_ID configurado: ' + SPREADSHEET_ID);
+
+    // 2. Verificar acceso al spreadsheet
+    Logger.log('\n2️⃣ Verificando acceso al spreadsheet...');
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log('✅ Acceso exitoso al spreadsheet: ' + ss.getName());
+
+    // 3. Listar todas las hojas
+    Logger.log('\n3️⃣ Listando todas las hojas...');
+    const allSheets = ss.getSheets();
+    Logger.log(`Total de hojas: ${allSheets.length}`);
+
+    // 4. Identificar hojas de reportes
+    Logger.log('\n4️⃣ Identificando hojas de reportes...');
+    const reportSheets = allSheets.filter(sheet => {
+      const name = sheet.getName();
+      return name.startsWith('RepNotas') ||
+             name.startsWith('RepAsist') ||
+             name.startsWith('RepCalif') ||
+             name.startsWith('Rep');
+    });
+    Logger.log(`Hojas de reportes encontradas: ${reportSheets.length}`);
+    reportSheets.forEach((sheet, idx) => {
+      Logger.log(`  ${idx + 1}. ${sheet.getName()} (${sheet.getLastRow()} filas, ${sheet.getLastColumn()} columnas)`);
+    });
+
+    // 5. Probar leerReporteExistente con el primer reporte
+    if (reportSheets.length > 0) {
+      Logger.log('\n5️⃣ Probando leerReporteExistente con el primer reporte...');
+      const primerReporte = reportSheets[0].getName();
+      Logger.log('Probando con: ' + primerReporte);
+
+      const resultado = leerReporteExistente(primerReporte);
+      if (resultado.success) {
+        Logger.log('✅ leerReporteExistente funciona correctamente');
+        Logger.log(`   - Registros: ${resultado.data.length}`);
+        Logger.log(`   - Columnas: ${resultado.headers.length}`);
+      } else {
+        Logger.log('❌ leerReporteExistente falló: ' + resultado.message);
+      }
+    } else {
+      Logger.log('\n5️⃣ ⚠️ No hay reportes para probar leerReporteExistente');
+    }
+
+    // 6. Probar listarReportesExistentes
+    Logger.log('\n6️⃣ Probando listarReportesExistentes...');
+    const listaResultado = listarReportesExistentes();
+    if (listaResultado.success) {
+      Logger.log('✅ listarReportesExistentes funciona correctamente');
+      Logger.log(`   - Reportes listados: ${listaResultado.data.length}`);
+    } else {
+      Logger.log('❌ listarReportesExistentes falló: ' + listaResultado.message);
+    }
+
+    // 7. Resumen final
+    Logger.log('\n7️⃣ RESUMEN:');
+    Logger.log('────────────────────────────────────────');
+    Logger.log(`✓ Spreadsheet accesible: SÍ`);
+    Logger.log(`✓ Total hojas: ${allSheets.length}`);
+    Logger.log(`✓ Hojas de reportes: ${reportSheets.length}`);
+    Logger.log(`✓ leerReporteExistente: ${reportSheets.length > 0 ? 'PROBADO' : 'NO PROBADO'}`);
+    Logger.log(`✓ listarReportesExistentes: PROBADO`);
+
+  } catch (error) {
+    Logger.log('\n❌ ERROR EN DIAGNÓSTICO:');
+    Logger.log('Error: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+  }
+
+  Logger.log('\n' + '='.repeat(80));
+  Logger.log('🔍 FIN DIAGNÓSTICO');
+  Logger.log('='.repeat(80));
+}
+
+/****************************************************************
+ * FUNCIONES PARA MÓDULO DE EVALUACIÓN                          *
+ ****************************************************************/
+
+/**
+ * Get instruments filtered by course
+ */
+function getInstrumentsByCourse(course) {
+  try {
+    Logger.log(`[getInstrumentsByCourse] Buscando instrumentos para curso: ${course}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // Intentar con diferentes nombres de hoja
+    let instrumentSheet = ss.getSheetByName('InstrumentosEvaluacion') ||
+                          ss.getSheetByName('Instrumentos de Evaluación') ||
+                          ss.getSheetByName('Instrumentos');
+
+    if (!instrumentSheet) {
+      Logger.log('[getInstrumentsByCourse] Hoja de instrumentos no encontrada');
+      Logger.log('[getInstrumentsByCourse] Hojas disponibles: ' + ss.getSheets().map(s => s.getName()).join(', '));
+      return [];
+    }
+
+    Logger.log(`[getInstrumentsByCourse] Usando hoja: ${instrumentSheet.getName()}`);
+
+    const data = instrumentSheet.getDataRange().getValues();
+    const headers = data[0];
+
+    Logger.log(`[getInstrumentsByCourse] Headers encontrados: ${headers.join(', ')}`);
+
+    // Find column indices - buscar variaciones de nombres
+    const idCol = headers.findIndex(h => h && (h.toString().toLowerCase() === 'id' || h.toString().toLowerCase() === 'idinstrumento'));
+    const nombreCol = headers.findIndex(h => h && (h.toString().toLowerCase().includes('nombre')));
+    const tipoCol = headers.findIndex(h => h && (h.toString().toLowerCase().includes('tipo')));
+    const cursoCol = headers.findIndex(h => h && (h.toString().toLowerCase() === 'curso' || h.toString().toLowerCase() === 'cursoid'));
+    const situacionCol = headers.findIndex(h => h && h.toString().toLowerCase().includes('situac'));
+    const criteriosCol = headers.findIndex(h => h && (h.toString().toLowerCase() === 'criterios' || h.toString().toLowerCase() === 'idinstrumentotipo'));
+
+    Logger.log(`[getInstrumentsByCourse] Índices de columnas - ID:${idCol}, Nombre:${nombreCol}, Tipo:${tipoCol}, Curso:${cursoCol}, Situación:${situacionCol}, Criterios:${criteriosCol}`);
+
+    if (idCol === -1 || nombreCol === -1 || tipoCol === -1 || cursoCol === -1) {
+      Logger.log('[getInstrumentsByCourse] ERROR: No se encontraron todas las columnas necesarias');
+      return [];
+    }
+
+    const instruments = [];
+
+    // Normalizar el curso buscado
+    const cursoNormalizado = normalizeCursoId(course);
+    Logger.log(`[getInstrumentsByCourse] Curso buscado: "${course}" normalizado a: "${cursoNormalizado}"`);
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      // Skip empty rows
+      if (!row[idCol]) continue;
+
+      // Normalizar el curso de la fila para comparar
+      const cursoCelda = row[cursoCol] ? row[cursoCol].toString() : '';
+      const cursoCeldaNormalizado = normalizeCursoId(cursoCelda);
+
+      // Filter by course (comparar normalizados)
+      if (cursoCeldaNormalizado === cursoNormalizado) {
+        const instrument = {
+          id: row[idCol],
+          nombre: row[nombreCol],
+          tipo: row[tipoCol],
+          curso: row[cursoCol],
+          situacionAprendizaje: situacionCol >= 0 ? (row[situacionCol] || '') : ''
+        };
+
+        // Parse criterios/items based on type
+        if (criteriosCol >= 0 && row[criteriosCol]) {
+          try {
+            const parsed = JSON.parse(row[criteriosCol]);
+            if (instrument.tipo === 'Rúbrica') {
+              instrument.criterios = parsed;
+            } else if (instrument.tipo === 'Lista de Cotejo') {
+              instrument.items = parsed;
+            }
+          } catch (e) {
+            Logger.log(`[getInstrumentsByCourse] Error parsing criterios for ${instrument.id}: ${e}`);
+          }
+        }
+
+        instruments.push(instrument);
+        Logger.log(`[getInstrumentsByCourse] Instrumento encontrado: ${instrument.nombre} (${instrument.tipo})`);
+      }
+    }
+
+    Logger.log(`[getInstrumentsByCourse] Total encontrados: ${instruments.length} instrumentos`);
+    return instruments;
+
+  } catch (error) {
+    Logger.log(`[getInstrumentsByCourse] Error: ${error.message}`);
+    Logger.log(`[getInstrumentsByCourse] Stack: ${error.stack}`);
+    throw error;
+  }
+}
+
+/**
+ * Get students filtered by course
+ */
+function getStudentsByCourse(course) {
+  try {
+    Logger.log(`[getStudentsByCourse] Buscando estudiantes para curso: ${course}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const studentsSheet = ss.getSheetByName('Estudiantes');
+
+    if (!studentsSheet) {
+      Logger.log('[getStudentsByCourse] Hoja de estudiantes no encontrada');
+      return [];
+    }
+
+    const data = studentsSheet.getDataRange().getValues();
+    const headers = data[0];
+
+    Logger.log(`[getStudentsByCourse] Headers encontrados: ${headers.join(', ')}`);
+
+    // Find column indices - buscar variaciones
+    const idCol = headers.findIndex(h => h && (h.toString().toLowerCase() === 'id' || h.toString().toLowerCase() === 'idestudiante'));
+    const nombreCol = headers.findIndex(h => h && h.toString().toLowerCase().includes('nombre'));
+    const cursoCol = headers.findIndex(h => h && (h.toString().toLowerCase() === 'curso' || h.toString().toLowerCase() === 'cursoid'));
+    const emailCol = headers.findIndex(h => h && h.toString().toLowerCase() === 'email');
+
+    Logger.log(`[getStudentsByCourse] Índices - ID:${idCol}, Nombre:${nombreCol}, Curso:${cursoCol}, Email:${emailCol}`);
+
+    if (idCol === -1 || nombreCol === -1 || cursoCol === -1) {
+      Logger.log('[getStudentsByCourse] ERROR: No se encontraron todas las columnas necesarias');
+      return [];
+    }
+
+    const students = [];
+
+    // Normalizar el curso buscado
+    const cursoNormalizado = normalizeCursoId(course);
+    Logger.log(`[getStudentsByCourse] Curso buscado: "${course}" normalizado a: "${cursoNormalizado}"`);
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      // Skip empty rows
+      if (!row[idCol]) continue;
+
+      // Normalizar el curso de la fila
+      const cursoCelda = row[cursoCol] ? row[cursoCol].toString() : '';
+      const cursoCeldaNormalizado = normalizeCursoId(cursoCelda);
+
+      // Filter by course (comparar normalizados)
+      if (cursoCeldaNormalizado === cursoNormalizado) {
+        students.push({
+          id: row[idCol],
+          nombre: row[nombreCol],
+          curso: row[cursoCol],
+          email: emailCol >= 0 ? (row[emailCol] || '') : ''
+        });
+      }
+    }
+
+    Logger.log(`[getStudentsByCourse] Encontrados ${students.length} estudiantes`);
+    return students;
+
+  } catch (error) {
+    Logger.log(`[getStudentsByCourse] Error: ${error.message}`);
+    Logger.log(`[getStudentsByCourse] Stack: ${error.stack}`);
+    throw error;
+  }
+}
+
+/**
+ * Get evaluations by instrument ID
+ */
+function getEvaluationsByInstrument(instrumentId) {
+  try {
+    Logger.log(`[getEvaluationsByInstrument] Buscando evaluaciones para instrumento: ${instrumentId}`);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let evalSheet = ss.getSheetByName('Evaluaciones');
+
+    // Create sheet if it doesn't exist
+    if (!evalSheet) {
+      Logger.log('[getEvaluationsByInstrument] Creando hoja de Evaluaciones');
+      evalSheet = ss.insertSheet('Evaluaciones');
+      evalSheet.appendRow([
+        'ID',
+        'Fecha',
+        'Estudiante ID',
+        'Estudiante',
+        'Curso',
+        'Instrumento ID',
+        'Instrumento',
+        'Tipo',
+        'Resultado',
+        'Notas'
+      ]);
+      return [];
+    }
+
+    const data = evalSheet.getDataRange().getValues();
+    const headers = data[0];
+
+    // Find column indices
+    const instrumentIdCol = headers.indexOf('Instrumento ID');
+    const studentIdCol = headers.indexOf('Estudiante ID');
+
+    const evaluations = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      // Filter by instrument ID
+      if (row[instrumentIdCol] === instrumentId) {
+        evaluations.push({
+          studentId: row[studentIdCol]
+        });
+      }
+    }
+
+    Logger.log(`[getEvaluationsByInstrument] Encontradas ${evaluations.length} evaluaciones`);
+    return evaluations;
+
+  } catch (error) {
+    Logger.log(`[getEvaluationsByInstrument] Error: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Get student evaluation for a specific instrument
+ */
+function getStudentEvaluation(studentId, instrumentId) {
+  try {
+    Logger.log(`[getStudentEvaluation] Buscando evaluación: estudiante=${studentId}, instrumento=${instrumentId}`);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let evalSheet = ss.getSheetByName('Evaluaciones');
+
+    if (!evalSheet) {
+      Logger.log('[getStudentEvaluation] No existe la hoja Evaluaciones');
+      return null;
+    }
+
+    const data = evalSheet.getDataRange().getValues();
+    const headers = data[0];
+
+    // Find column indices
+    const idCol = headers.indexOf('ID');
+    const fechaCol = headers.indexOf('Fecha');
+    const studentIdCol = headers.indexOf('Estudiante ID');
+    const studentCol = headers.indexOf('Estudiante');
+    const courseCol = headers.indexOf('Curso');
+    const instrumentIdCol = headers.indexOf('Instrumento ID');
+    const instrumentCol = headers.indexOf('Instrumento');
+    const tipoCol = headers.indexOf('Tipo');
+    const resultadoCol = headers.indexOf('Resultado');
+    const notasCol = headers.indexOf('Notas');
+
+    // Find the evaluation
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      if (row[studentIdCol] === studentId && row[instrumentIdCol] === instrumentId) {
+        // Parse the resultado JSON
+        let resultado;
+        try {
+          resultado = JSON.parse(row[resultadoCol]);
+        } catch (e) {
+          Logger.log(`[getStudentEvaluation] Error parseando resultado: ${e.message}`);
+          resultado = row[resultadoCol];
+        }
+
+        const evaluation = {
+          id: row[idCol],
+          fecha: row[fechaCol],
+          studentId: row[studentIdCol],
+          studentName: row[studentCol],
+          course: row[courseCol],
+          instrumentId: row[instrumentIdCol],
+          instrumentName: row[instrumentCol],
+          tipo: row[tipoCol],
+          resultado: resultado,
+          notes: row[notasCol]
+        };
+
+        Logger.log(`[getStudentEvaluation] Evaluación encontrada`);
+        return evaluation;
+      }
+    }
+
+    Logger.log(`[getStudentEvaluation] No se encontró evaluación`);
+    return null;
+
+  } catch (error) {
+    Logger.log(`[getStudentEvaluation] Error: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Save evaluation
+ */
+function saveEvaluation(evaluationData) {
+  try {
+    Logger.log(`[saveEvaluation] Guardando evaluación para estudiante: ${evaluationData.studentName}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // ★ Guardar directamente en CalificacionesDetalladas (igual que los formularios originales)
+    let sheet = ss.getSheetByName('CalificacionesDetalladas');
+    if (!sheet) {
+      Logger.log('[saveEvaluation] Creando hoja CalificacionesDetalladas');
+      sheet = ss.insertSheet('CalificacionesDetalladas');
+      sheet.appendRow([
+        'IDCalificacionDetalle','IDCalificacionMaestra','NombreInstrumento',
+        'AlumnoEvaluador','NombreEstudiante','CursoEvaluado','NombreSituacion',
+        'FechaEvaluacion','NombreCriterioEvaluado','NombreNivelAlcanzado',
+        'PuntuacionCriterio','DescripcionItemEvaluado','CompletadoItem',
+        'CalificacionTotalInstrumento','ComentariosGenerales','ComentariosGlobales'
+      ]);
+    }
+
+    const idDet = Utilities.getUuid();
+    const idMae = Utilities.getUuid();
+    const fecha = new Date(evaluationData.fecha);
+
+    // Obtener información del instrumento y estudiante
+    const instrumentoBasico = getInstrumentoById(ss, evaluationData.instrumentId);
+    if (!instrumentoBasico) throw new Error('Instrumento no encontrado: ' + evaluationData.instrumentId);
+
+    // ★ Cargar detalles completos del instrumento (con criterios/niveles)
+    const instrumentoCompleto = getInstrumentDetails(evaluationData.instrumentId);
+    const instrumento = { ...instrumentoBasico, ...instrumentoCompleto };
+
+    const estudiantes = getEstudiantes(ss);
+    const estudiante = estudiantes.find(e => e.IDEstudiante === evaluationData.studentId);
+    if (!estudiante) throw new Error('Estudiante no encontrado: ' + evaluationData.studentId);
+
+    const cursoEval = estudiante.Curso || estudiante.CursoEvaluado || estudiante.CursoID || '';
+    const nombreSitu = instrumentoBasico.NombreSituacion || getNombreSituacion(ss, instrumentoBasico);
+
+    // Procesar según el tipo de instrumento
+    if (evaluationData.tipo === 'Rúbrica') {
+      // ★ FORMATO COMPATIBLE CON recordRubricaGrade
+      const criteriosResult = evaluationData.resultado.criterios || [];
+      const calTotal = evaluationData.resultado.calificacion || evaluationData.resultado.puntosTotales || 0;
+
+      // Obtener descriptores desde Definicion_Rubricas
+      const { headers: defH, values: defV } = getSheetData(ss, 'Definicion_Rubricas');
+      const rubricaId = instrumentoBasico.IDInstrumentoTipo;
+      const iDescDef = idx(defH, ['Descriptor', 'Descripcion', 'Descripción']);
+
+      const descriptoresMap = {};
+      defV.filter(r => r[defH.indexOf('IDRubrica')] === rubricaId).forEach(r => {
+        const criterioId = r[defH.indexOf('IDCriterio')];
+        const nivelId = r[defH.indexOf('IDNivel')];
+        const key = `${criterioId}|${nivelId}`;
+        descriptoresMap[key] = r[iDescDef] || '';
+      });
+
+      // Insertar una fila por cada criterio evaluado
+      criteriosResult.forEach(crit => {
+        // Buscar el criterio y nivel correspondiente para obtener IDs
+        const criterioObj = (instrumento.criterios || []).find(c => c.nombre === crit.criterio);
+        if (!criterioObj) {
+          Logger.log(`⚠️ Criterio no encontrado: ${crit.criterio}`);
+          return;
+        }
+
+        const nivelObj = (criterioObj.niveles || []).find(n => n.valor === crit.nivel || n.nombre === crit.nivel);
+        if (!nivelObj) {
+          Logger.log(`⚠️ Nivel no encontrado: ${crit.nivel} para criterio ${crit.criterio}`);
+          return;
+        }
+
+        const key = `${criterioObj.id}|${nivelObj.id}`;
+        const descriptor = descriptoresMap[key] || '';
+
+        const newRow = [
+          idDet, idMae, instrumentoBasico.NombreInstrumento, '',
+          estudiante.NombreEstudiante, cursoEval, nombreSitu, fecha,
+          crit.criterio, crit.nivel, crit.puntos, descriptor, '',
+          calTotal.toFixed(2), evaluationData.notes || '', ''
+        ];
+        sheet.appendRow(newRow);
+      });
+
+      Logger.log(`[saveEvaluation] Rúbrica guardada: ${criteriosResult.length} criterios, nota ${calTotal.toFixed(2)}`);
+
+    } else if (evaluationData.tipo === 'Lista de Cotejo') {
+      // ★ FORMATO COMPATIBLE CON recordListaCotejoGrade
+      const items = evaluationData.resultado.items || [];
+      const calTotal = evaluationData.resultado.calificacion || 0;
+
+      items.forEach(item => {
+        const newRow = [
+          idDet, idMae, instrumentoBasico.NombreInstrumento, '',
+          estudiante.NombreEstudiante, cursoEval, nombreSitu, fecha,
+          '', '', '', item.item, (item.completado ? 'Sí' : 'No'),
+          calTotal.toFixed(2), evaluationData.notes || '', ''
+        ];
+        sheet.appendRow(newRow);
+      });
+
+      Logger.log(`[saveEvaluation] Lista de Cotejo guardada: ${items.length} items, nota ${calTotal.toFixed(2)}`);
+
+    } else if (evaluationData.tipo === 'Calificación Directa') {
+      // ★ FORMATO COMPATIBLE CON recordNumericGrade
+      const calificacion = evaluationData.resultado.calificacion || 0;
+
+      const newRow = [
+        idDet, idMae, instrumentoBasico.NombreInstrumento, '',
+        estudiante.NombreEstudiante, cursoEval, nombreSitu, fecha,
+        '', '', '', '', '', calificacion.toFixed(2), '', evaluationData.notes || ''
+      ];
+      sheet.appendRow(newRow);
+
+      Logger.log(`[saveEvaluation] Calificación Directa guardada: nota ${calificacion.toFixed(2)}`);
+    }
+
+    return {
+      success: true,
+      id: idMae
+    };
+
+  } catch (error) {
+    Logger.log(`[saveEvaluation] Error: ${error.message}`);
+    Logger.log(`[saveEvaluation] Stack: ${error.stack}`);
+    throw error;
+  }
+}
+
+/**
+ * Get complete instrument details including criteria/items
+ */
+function getInstrumentDetails(instrumentId) {
+  try {
+    Logger.log(`[getInstrumentDetails] Obteniendo detalles del instrumento: ${instrumentId}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const instrumento = getInstrumentoById(ss, instrumentId);
+
+    if (!instrumento) {
+      Logger.log(`[getInstrumentDetails] Instrumento no encontrado: ${instrumentId}`);
+      return null;
+    }
+
+    Logger.log(`[getInstrumentDetails] Instrumento encontrado: ${instrumento.NombreInstrumento}, Tipo: ${instrumento.TipoInstrumento}`);
+
+    const result = {
+      id: instrumento.IDInstrumento,
+      nombre: instrumento.NombreInstrumento,
+      tipo: instrumento.TipoInstrumento
+    };
+
+    // Según el tipo de instrumento, cargar los detalles específicos
+    if (instrumento.TipoInstrumento === 'Rúbrica') {
+      // Cargar criterios y niveles de la rúbrica
+      const rubricaId = instrumento.IDInstrumentoTipo;
+      const { headers: defHeaders, values: defValues } = getSheetData(ss, 'Definicion_Rubricas');
+
+      const rubricaData = defValues.filter(row => row[defHeaders.indexOf('IDRubrica')] === rubricaId);
+      const criteriosMap = new Map();
+      const nivelesMap = new Map();
+      const iDesc = idx(defHeaders, ['Descriptor', 'Descripcion', 'Descripción']);
+
+      rubricaData.forEach(row => {
+        const criterioId = row[defHeaders.indexOf('IDCriterio')];
+        const nivelId = row[defHeaders.indexOf('IDNivel')];
+        const descriptor = row[iDesc] || '';
+
+        if (!criteriosMap.has(criterioId)) {
+          criteriosMap.set(criterioId, {
+            id: criterioId,
+            nombre: getCriterioNombre(ss, criterioId),
+            niveles: [],
+            descriptoresPorNivel: []
+          });
+        }
+
+        // Obtener información del nivel
+        const nivelInfo = getNivelInfo(ss, nivelId);
+        const nivelData = {
+          id: nivelId,
+          nombre: nivelInfo.NombreNivel,
+          valor: nivelInfo.NombreNivel,
+          puntos: nivelInfo.PuntuacionNivel,
+          descriptor: descriptor
+        };
+
+        // Agregar el nivel a este criterio específico (evitar duplicados)
+        const criterio = criteriosMap.get(criterioId);
+        if (!criterio.niveles.find(n => n.id === nivelId)) {
+          criterio.niveles.push(nivelData);
+        }
+
+        // Mantener también el mapa global de niveles para referencia
+        if (!nivelesMap.has(nivelId)) {
+          nivelesMap.set(nivelId, nivelData);
+        }
+      });
+
+      // Construir criterios (ya tienen sus niveles asignados)
+      result.criterios = Array.from(criteriosMap.values());
+
+      Logger.log(`[getInstrumentDetails] Rúbrica con ${result.criterios.length} criterios cargada`);
+
+    } else if (instrumento.TipoInstrumento === 'Lista de Cotejo') {
+      // Cargar items de la lista de cotejo
+      const listaCotejoId = instrumento.IDInstrumentoTipo;
+      const { headers: itemHeaders, values: itemValues } = getSheetData(ss, 'ItemsListaCotejo');
+
+      const items = itemValues
+        .filter(row => row[itemHeaders.indexOf('IDListaCotejo')] === listaCotejoId)
+        .map(row => ({
+          id: row[itemHeaders.indexOf('IDItem')],
+          descripcion: row[itemHeaders.indexOf('Descripcion')]
+        }));
+
+      result.items = items;
+      Logger.log(`[getInstrumentDetails] Lista de Cotejo con ${result.items.length} items cargada`);
+
+    } else if (instrumento.TipoInstrumento === 'Calificación Directa') {
+      // No hay detalles adicionales para calificación directa
+      result.minGrade = 0;
+      result.maxGrade = 10;
+      Logger.log(`[getInstrumentDetails] Calificación Directa (0-10)`);
+    }
+
+    return result;
+
+  } catch (error) {
+    Logger.log(`[getInstrumentDetails] Error: ${error.message}`);
+    Logger.log(`[getInstrumentDetails] Stack: ${error.stack}`);
+    throw error;
+  }
+}
+
+/****************************************************************
+ * FIN FUNCIONES PARA MÓDULO DE EVALUACIÓN                     *
+ ****************************************************************/
 
 /****************************************************************
  * FIN DE INTEGRACIONES Y OPTIMIZACIONES                        *
