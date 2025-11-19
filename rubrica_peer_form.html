@@ -284,6 +284,89 @@
   <script>
     // Serializar criterios del servidor
     const criteriosServer = <?!= JSON.stringify(rubrica.criterios) ?>;
+
+    // Función para cargar evaluación existente
+    function loadExistingEvaluation() {
+      const evaluadorId = document.getElementById('evaluadorSelect').value;
+      const instrumentoID = document.querySelector('input[name="instrumentoID"]').value;
+      const isAutoEval = document.querySelector('input[name="evaluationType"]').value === 'auto';
+
+      let evaluadoId = evaluadorId; // Por defecto para autoevaluación
+
+      if (!isAutoEval) {
+        const evaluadoSelect = document.getElementById('evaluadoSelect');
+        if (!evaluadoSelect || !evaluadoSelect.value) {
+          return; // No hay evaluado seleccionado todavía
+        }
+        evaluadoId = evaluadoSelect.value;
+
+        if (evaluadorId === evaluadoId) {
+          return; // No cargar si son la misma persona en coevaluación
+        }
+      }
+
+      if (!evaluadorId || !evaluadoId) {
+        return;
+      }
+
+      const fb = document.getElementById('feedback');
+      fb.style.display = 'block';
+      fb.className = 'feedback';
+      fb.textContent = 'Cargando evaluación existente...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          fb.style.display = 'none';
+
+          if (result.success && result.data) {
+            // Primero limpiar todas las selecciones previas
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+              radio.checked = false;
+            });
+
+            // Marcar los radio buttons correspondientes
+            Object.keys(result.data.criterios).forEach(criterioId => {
+              const nivelId = result.data.criterios[criterioId];
+              const radioId = 'c_' + criterioId + '_n_' + nivelId;
+              const radio = document.getElementById(radioId);
+              if (radio) {
+                radio.checked = true;
+              }
+            });
+
+            // Cargar comentarios
+            if (result.data.comentarios) {
+              document.getElementById('comments').value = result.data.comentarios;
+            }
+
+            // Mostrar mensaje de evaluación existente
+            fb.style.display = 'block';
+            fb.className = 'feedback success';
+            fb.textContent = '✅ Evaluación existente cargada';
+            setTimeout(() => { fb.style.display = 'none'; }, 3000);
+          } else {
+            // No hay evaluación previa, limpiar formulario
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+              radio.checked = false;
+            });
+            document.getElementById('comments').value = '';
+          }
+        })
+        .withFailureHandler(function(err) {
+          fb.className = 'feedback error';
+          fb.textContent = '⚠️ Error al cargar evaluación: ' + err.message;
+          setTimeout(() => { fb.style.display = 'none'; }, 3000);
+        })
+        .getExistingRubricaPeerEvaluation(instrumentoID, evaluadorId, evaluadoId);
+    }
+
+    // Event listeners para cargar evaluación cuando cambian los selects
+    document.getElementById('evaluadorSelect').addEventListener('change', loadExistingEvaluation);
+
+    <? if (!isAutoEvaluacion) { ?>
+      document.getElementById('evaluadoSelect').addEventListener('change', loadExistingEvaluation);
+    <? } ?>
+
     document.getElementById('saveBtn').addEventListener('click', function(e) {
       e.preventDefault();
 

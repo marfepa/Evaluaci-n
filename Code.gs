@@ -1272,6 +1272,113 @@ function getExistingRubricaEvaluation(instrumentoID, studentId) {
   }
 }
 
+function getExistingRubricaPeerEvaluation(instrumentoID, evaluadorId, evaluadoId) {
+  try {
+    if (!instrumentoID || !evaluadorId || !evaluadoId) {
+      return { success: false, data: null };
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName('CalificacionesDetalladas');
+
+    if (!sheet) {
+      return { success: false, data: null };
+    }
+
+    // Obtener datos de la hoja
+    const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
+
+    if (!values || values.length === 0) {
+      return { success: false, data: null };
+    }
+
+    // Obtener información del instrumento, evaluador y evaluado
+    const instrumento = getInstrumentoById(ss, instrumentoID);
+    const evaluador = getEstudiantes(ss).find(e => e.IDEstudiante === evaluadorId);
+    const evaluado = getEstudiantes(ss).find(e => e.IDEstudiante === evaluadoId);
+
+    if (!instrumento || !evaluador || !evaluado) {
+      return { success: false, data: null };
+    }
+
+    // Buscar registros que coincidan con instrumento, evaluador y evaluado
+    const iNombreInst = headers.indexOf('NombreInstrumento');
+    const iNombreEvaluador = headers.indexOf('NombreEvaluador');
+    const iNombreEst = headers.indexOf('NombreEstudiante');
+    const iNombreCrit = headers.indexOf('NombreCriterioEvaluado');
+    const iNombreNivel = headers.indexOf('NombreNivelAlcanzado');
+    const iComentarios = headers.indexOf('ComentariosGenerales');
+
+    if (iNombreInst === -1 || iNombreEst === -1 || iNombreCrit === -1 || iNombreNivel === -1) {
+      return { success: false, data: null };
+    }
+
+    // Filtrar registros que coincidan con instrumento, evaluador y evaluado
+    const registros = values.filter(row => {
+      const matchInstrumento = row[iNombreInst] === instrumento.NombreInstrumento;
+      const matchEvaluado = row[iNombreEst] === evaluado.NombreEstudiante;
+      const matchEvaluador = iNombreEvaluador !== -1 ? row[iNombreEvaluador] === evaluador.NombreEstudiante : true;
+
+      return matchInstrumento && matchEvaluado && matchEvaluador;
+    });
+
+    if (registros.length === 0) {
+      return { success: false, data: null };
+    }
+
+    // Obtener criterios y niveles de la definición de la rúbrica
+    const { headers: defHeaders, values: defValues } = getSheetData(ss, 'Definicion_Rubricas');
+    const rubricaId = instrumento.IDInstrumentoTipo;
+
+    // Crear mapas de criterios y niveles por nombre
+    const criteriosPorNombre = {};
+    const nivelesPorNombre = {};
+
+    defValues.filter(row => row[defHeaders.indexOf('IDRubrica')] === rubricaId).forEach(row => {
+      const criterioId = row[defHeaders.indexOf('IDCriterio')];
+      const nivelId = row[defHeaders.indexOf('IDNivel')];
+
+      const nombreCriterio = getCriterioNombre(ss, criterioId);
+      const nivelInfo = getNivelInfo(ss, nivelId);
+
+      if (!criteriosPorNombre[nombreCriterio]) {
+        criteriosPorNombre[nombreCriterio] = criterioId;
+      }
+
+      const key = `${nombreCriterio}|${nivelInfo.NombreNivel}`;
+      nivelesPorNombre[key] = nivelId;
+    });
+
+    // Construir objeto con evaluación existente
+    const evaluacionExistente = {
+      criterios: {},
+      comentarios: registros[0][iComentarios] || ''
+    };
+
+    registros.forEach(row => {
+      const nombreCriterio = row[iNombreCrit];
+      const nombreNivel = row[iNombreNivel];
+
+      const criterioId = criteriosPorNombre[nombreCriterio];
+      const key = `${nombreCriterio}|${nombreNivel}`;
+      const nivelId = nivelesPorNombre[key];
+
+      if (criterioId && nivelId) {
+        evaluacionExistente.criterios[criterioId] = nivelId;
+      }
+    });
+
+    return {
+      success: true,
+      data: evaluacionExistente
+    };
+
+  } catch (err) {
+    Logger.log('✖ getExistingRubricaPeerEvaluation: ' + err);
+    return { success: false, data: null };
+  }
+}
+
 function recordRubricaPeerGrade(formData) {
   try {
     // ★ VALIDACIÓN DEL SERVIDOR
