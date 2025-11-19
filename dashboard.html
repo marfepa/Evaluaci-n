@@ -4763,68 +4763,90 @@
       const instrument = evaluationData.instrumentDetails;
       const resultado = evaluation.resultado;
 
-      console.log('📝 Cargando datos:', resultado);
+      console.log('📥 Datos recibidos:', resultado);
 
       // 1. Cargar Comentarios
       const notesField = document.getElementById('evaluationNotes');
       if (notesField) notesField.value = evaluation.notes || '';
 
-      // 2. Cargar Calificación Directa (si aplica)
+      // 2. Cargar Calificación Directa
       if (document.getElementById('directGrade') && resultado.calificacion) {
         document.getElementById('directGrade').value = resultado.calificacion;
       }
 
-      // 3. Cargar Rúbricas (Mapeo por texto)
+      // 3. Cargar Rúbricas (Lógica de limpieza de texto)
       if (instrument.tipo === 'Rúbrica' && resultado.criterios) {
-        // Recorremos los bloques de criterios en el HTML
-        document.querySelectorAll('.evaluation-criterion').forEach((critDiv) => {
-          // Extraer nombre del criterio del título (ej: "1. Technical Execution" -> "Technical Execution")
-          const titleEl = critDiv.querySelector('.evaluation-criterion-title');
-          const critName = titleEl.innerText.replace(/^\d+\.\s*/, '').trim();
 
-          // Buscar si este criterio tiene nota guardada
-          const savedCrit = resultado.criterios.find(c => c.criterio === critName);
+        const domCriterios = document.querySelectorAll('.evaluation-criterion');
 
-          if (savedCrit) {
-            // Buscar el radio button que coincida con el VALOR guardado (ej: "Competent")
-            // En tu dashboard, los valores de los radios son los Nombres de los Niveles.
-            const radio = Array.from(critDiv.querySelectorAll('input[type="radio"]'))
-              .find(r => r.value === savedCrit.nivel || r.dataset.nombre === savedCrit.nivel);
+        // Recorremos los criterios guardados en BD
+        resultado.criterios.forEach(savedCrit => {
 
-            if (radio) {
-              radio.checked = true;
-              // Forzar actualización visual si hay estilos dependientes
-              radio.parentElement.classList.add('selected');
-            }
+          // Buscamos el bloque HTML correspondiente
+          // Normalizamos quitando números iniciales "1. ", espacios y mayúsculas
+          const cleanSavedCritName = String(savedCrit.criterio).replace(/^\d+\.?\s*/, '').trim().toLowerCase();
+
+          let targetBlock = null;
+          domCriterios.forEach(block => {
+            const title = block.querySelector('.evaluation-criterion-title').innerText;
+            const cleanTitle = title.replace(/^\d+\.?\s*/, '').trim().toLowerCase();
+            if (cleanTitle === cleanSavedCritName) targetBlock = block;
+          });
+
+          if (targetBlock) {
+            // Encontramos el bloque, ahora buscamos el nivel (Radio Button)
+            // Comparamos el savedLevel contra value, data-nombre y el texto del label
+            const cleanSavedLevel = String(savedCrit.nivel).trim().toLowerCase();
+            const radios = targetBlock.querySelectorAll('input[type="radio"]');
+
+            radios.forEach(radio => {
+              const val = String(radio.value).trim().toLowerCase();
+              const name = String(radio.dataset.nombre || '').trim().toLowerCase();
+
+              // Comparación flexible
+              if (val === cleanSavedLevel || name === cleanSavedLevel) {
+                radio.checked = true;
+                // Disparar evento change por si hay lógica visual asociada
+                radio.dispatchEvent(new Event('change'));
+              }
+            });
           }
         });
       }
 
-      // 4. Cargar Listas de Cotejo
-      if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
-        const domItems = document.querySelectorAll('.evaluation-criterion span');
+      // 4. Cargar Lista de Cotejo
+      else if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
+         const domItems = document.querySelectorAll('.evaluation-criterion'); // En lista cotejo cada item es una 'fila'
 
-        resultado.items.forEach(itemGuardado => {
-          domItems.forEach(span => {
-            if (span.textContent.trim() === itemGuardado.item) {
-              const checkbox = span.parentElement.querySelector('input[type="checkbox"]');
-              if (checkbox) {
-                checkbox.checked = itemGuardado.completado;
-              }
-            }
-          });
-        });
+         resultado.items.forEach(savedItem => {
+           const cleanSavedText = String(savedItem.item).trim().toLowerCase();
+
+           domItems.forEach(block => {
+             const labelSpan = block.querySelector('span');
+             if(labelSpan) {
+               const cleanLabel = labelSpan.textContent.trim().toLowerCase();
+               if (cleanLabel === cleanSavedText) {
+                 const checkbox = block.querySelector('input[type="checkbox"]');
+                 if (checkbox) {
+                   checkbox.checked = savedItem.completado;
+                 }
+               }
+             }
+           });
+         });
       }
 
-      // 5. Notificar al usuario
+      // Feedback visual
       const panel = document.querySelector('.evaluation-panel-content');
-      if (panel) {
-        const msg = document.createElement('div');
-        msg.className = 'alert alert-warning';
-        msg.innerHTML = '⚠️ <strong>Modo Revisión:</strong> Editando una evaluación existente.';
-        msg.style.marginBottom = '1rem';
-        panel.insertBefore(msg, panel.firstChild);
-      }
+      // Eliminar alertas previas si existen
+      const oldAlert = panel.querySelector('.alert-mode-info');
+      if(oldAlert) oldAlert.remove();
+
+      const msg = document.createElement('div');
+      msg.className = 'alert alert-info alert-mode-info';
+      msg.style.cssText = 'margin-bottom: 1rem; padding: 1rem; background: #e0f2fe; border-left: 4px solid #0ea5e9; color: #0369a1;';
+      msg.innerHTML = `<strong>Modo Revisión:</strong> Visualizando evaluación del ${new Date(evaluation.fecha).toLocaleDateString()}`;
+      panel.insertBefore(msg, panel.firstChild);
     }
 
     /**
