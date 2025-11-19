@@ -4655,6 +4655,66 @@ function getStudentEvaluation(studentId, instrumentId) {
 }
 
 /**
+ * Delete existing evaluation by student and instrument
+ */
+function deleteExistingEvaluation(studentId, instrumentId) {
+  try {
+    Logger.log(`[deleteExistingEvaluation] Eliminando evaluación: estudiante=${studentId}, instrumento=${instrumentId}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // Delete from Evaluaciones sheet
+    let evalSheet = ss.getSheetByName('Evaluaciones');
+    if (evalSheet) {
+      const data = evalSheet.getDataRange().getValues();
+      const headers = data[0];
+      const studentIdCol = headers.indexOf('Estudiante ID');
+      const instrumentIdCol = headers.indexOf('Instrumento ID');
+
+      // Find and delete matching rows (iterate backwards to avoid index issues)
+      for (let i = data.length - 1; i >= 1; i--) {
+        if (data[i][studentIdCol] === studentId && data[i][instrumentIdCol] === instrumentId) {
+          evalSheet.deleteRow(i + 1);
+          Logger.log(`[deleteExistingEvaluation] Eliminada fila ${i + 1} de Evaluaciones`);
+        }
+      }
+    }
+
+    // Delete from CalificacionesDetalladas sheet
+    let detSheet = ss.getSheetByName('CalificacionesDetalladas');
+    if (detSheet) {
+      const data = detSheet.getDataRange().getValues();
+      const headers = data[0];
+      const studentCol = headers.indexOf('NombreEstudiante');
+      const instrumentCol = headers.indexOf('NombreInstrumento');
+
+      // Get student and instrument names for matching
+      const estudiantes = getEstudiantes(ss);
+      const estudiante = estudiantes.find(e => e.IDEstudiante === studentId);
+      const instrumentoBasico = getInstrumentoById(ss, instrumentId);
+
+      if (estudiante && instrumentoBasico) {
+        // Find and delete matching rows (iterate backwards)
+        for (let i = data.length - 1; i >= 1; i--) {
+          if (data[i][studentCol] === estudiante.NombreEstudiante &&
+              data[i][instrumentCol] === instrumentoBasico.NombreInstrumento) {
+            detSheet.deleteRow(i + 1);
+            Logger.log(`[deleteExistingEvaluation] Eliminada fila ${i + 1} de CalificacionesDetalladas`);
+          }
+        }
+      }
+    }
+
+    Logger.log('[deleteExistingEvaluation] Evaluación eliminada exitosamente');
+    return { success: true };
+
+  } catch (error) {
+    Logger.log(`[deleteExistingEvaluation] Error: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Save evaluation
  */
 function saveEvaluation(evaluationData) {
@@ -4774,6 +4834,41 @@ function saveEvaluation(evaluationData) {
 
       Logger.log(`[saveEvaluation] Calificación Directa guardada: nota ${calificacion.toFixed(2)}`);
     }
+
+    // ★ Guardar también en la hoja "Evaluaciones" para rastreo de estado
+    let evalSheet = ss.getSheetByName('Evaluaciones');
+    if (!evalSheet) {
+      Logger.log('[saveEvaluation] Creando hoja Evaluaciones');
+      evalSheet = ss.insertSheet('Evaluaciones');
+      evalSheet.appendRow([
+        'ID',
+        'Fecha',
+        'Estudiante ID',
+        'Estudiante',
+        'Curso',
+        'Instrumento ID',
+        'Instrumento',
+        'Tipo',
+        'Resultado',
+        'Notas'
+      ]);
+    }
+
+    // Crear registro de evaluación con el resultado completo
+    const evalRow = [
+      idMae,
+      fecha,
+      evaluationData.studentId,
+      evaluationData.studentName,
+      evaluationData.course,
+      evaluationData.instrumentId,
+      evaluationData.instrumentName,
+      evaluationData.tipo,
+      JSON.stringify(evaluationData.resultado),
+      evaluationData.notes || ''
+    ];
+    evalSheet.appendRow(evalRow);
+    Logger.log(`[saveEvaluation] Registro añadido a hoja Evaluaciones`);
 
     return {
       success: true,
