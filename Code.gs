@@ -483,7 +483,8 @@ function getInstrumentos(ss) {
 /** OBTENER INSTRUMENTO POR ID */
 function getInstrumentoById(ss, instrumentId) {
   const instrumentos = getInstrumentos(ss);
-  return instrumentos.find(inst => inst.IDInstrumento === instrumentId);
+  // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
+  return instrumentos.find(inst => String(inst.IDInstrumento) === String(instrumentId));
 }
 
 /** OBTENER ESTUDIANTES */
@@ -4567,7 +4568,8 @@ function getEvaluationsByInstrument(instrumentId) {
       const row = data[i];
 
       // Filter by instrument ID
-      if (row[instrumentIdCol] === instrumentId) {
+      // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
+      if (String(row[instrumentIdCol]) === String(instrumentId)) {
         evaluations.push({
           studentId: row[studentIdCol]
         });
@@ -4617,7 +4619,8 @@ function getStudentEvaluation(studentId, instrumentId) {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
 
-      if (row[studentIdCol] === studentId && row[instrumentIdCol] === instrumentId) {
+      // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
+      if (String(row[studentIdCol]) === String(studentId) && String(row[instrumentIdCol]) === String(instrumentId)) {
         // Parse the resultado JSON
         let resultado;
         try {
@@ -4673,7 +4676,8 @@ function deleteExistingEvaluation(studentId, instrumentId) {
 
       // Find and delete matching rows (iterate backwards to avoid index issues)
       for (let i = data.length - 1; i >= 1; i--) {
-        if (data[i][studentIdCol] === studentId && data[i][instrumentIdCol] === instrumentId) {
+        // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
+        if (String(data[i][studentIdCol]) === String(studentId) && String(data[i][instrumentIdCol]) === String(instrumentId)) {
           evalSheet.deleteRow(i + 1);
           Logger.log(`[deleteExistingEvaluation] Eliminada fila ${i + 1} de Evaluaciones`);
         }
@@ -4690,7 +4694,8 @@ function deleteExistingEvaluation(studentId, instrumentId) {
 
       // Get student and instrument names for matching
       const estudiantes = getEstudiantes(ss);
-      const estudiante = estudiantes.find(e => e.IDEstudiante === studentId);
+      // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
+      const estudiante = estudiantes.find(e => String(e.IDEstudiante) === String(studentId));
       const instrumentoBasico = getInstrumentoById(ss, instrumentId);
 
       if (estudiante && instrumentoBasico) {
@@ -4750,7 +4755,8 @@ function saveEvaluation(evaluationData) {
     const instrumento = { ...instrumentoBasico, ...instrumentoCompleto };
 
     const estudiantes = getEstudiantes(ss);
-    const estudiante = estudiantes.find(e => e.IDEstudiante === evaluationData.studentId);
+    // Comparación flexible: convertir ambos valores a string para evitar problemas de tipo
+    const estudiante = estudiantes.find(e => String(e.IDEstudiante) === String(evaluationData.studentId));
     if (!estudiante) throw new Error('Estudiante no encontrado: ' + evaluationData.studentId);
 
     const cursoEval = estudiante.Curso || estudiante.CursoEvaluado || estudiante.CursoID || '';
