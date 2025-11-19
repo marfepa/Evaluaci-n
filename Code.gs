@@ -1165,6 +1165,113 @@ function recordRubricaGrade(formData) {
   }
 }
 
+/**
+ * RECUPERAR EVALUACIÓN EXISTENTE DE RÚBRICA
+ * Busca en CalificacionesDetalladas si existe una evaluación previa
+ * para un estudiante e instrumento específico
+ */
+function getExistingRubricaEvaluation(instrumentoID, studentId) {
+  try {
+    if (!instrumentoID || !studentId) {
+      return { success: false, data: null };
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName('CalificacionesDetalladas');
+
+    if (!sheet) {
+      return { success: false, data: null };
+    }
+
+    // Obtener datos de la hoja
+    const { headers, values } = getSheetData(ss, 'CalificacionesDetalladas');
+
+    if (!values || values.length === 0) {
+      return { success: false, data: null };
+    }
+
+    // Obtener información del instrumento y estudiante
+    const instrumento = getInstrumentoById(ss, instrumentoID);
+    const estudiante = getEstudiantes(ss).find(e => e.IDEstudiante === studentId);
+
+    if (!instrumento || !estudiante) {
+      return { success: false, data: null };
+    }
+
+    // Buscar registros que coincidan
+    const iNombreInst = headers.indexOf('NombreInstrumento');
+    const iNombreEst = headers.indexOf('NombreEstudiante');
+    const iNombreCrit = headers.indexOf('NombreCriterioEvaluado');
+    const iNombreNivel = headers.indexOf('NombreNivelAlcanzado');
+    const iComentarios = headers.indexOf('ComentariosGenerales');
+
+    if (iNombreInst === -1 || iNombreEst === -1 || iNombreCrit === -1 || iNombreNivel === -1) {
+      return { success: false, data: null };
+    }
+
+    // Filtrar registros del estudiante e instrumento
+    const registros = values.filter(row =>
+      row[iNombreInst] === instrumento.NombreInstrumento &&
+      row[iNombreEst] === estudiante.NombreEstudiante
+    );
+
+    if (registros.length === 0) {
+      return { success: false, data: null };
+    }
+
+    // Obtener criterios y niveles de la definición de la rúbrica
+    const { headers: defHeaders, values: defValues } = getSheetData(ss, 'Definicion_Rubricas');
+    const rubricaId = instrumento.IDInstrumentoTipo;
+
+    // Crear mapas de criterios y niveles por nombre
+    const criteriosPorNombre = {};
+    const nivelesPorNombre = {};
+
+    defValues.filter(row => row[defHeaders.indexOf('IDRubrica')] === rubricaId).forEach(row => {
+      const criterioId = row[defHeaders.indexOf('IDCriterio')];
+      const nivelId = row[defHeaders.indexOf('IDNivel')];
+
+      const nombreCriterio = getCriterioNombre(ss, criterioId);
+      const nivelInfo = getNivelInfo(ss, nivelId);
+
+      if (!criteriosPorNombre[nombreCriterio]) {
+        criteriosPorNombre[nombreCriterio] = criterioId;
+      }
+
+      const key = `${nombreCriterio}|${nivelInfo.NombreNivel}`;
+      nivelesPorNombre[key] = nivelId;
+    });
+
+    // Construir objeto con evaluación existente
+    const evaluacionExistente = {
+      criterios: {},
+      comentarios: registros[0][iComentarios] || ''
+    };
+
+    registros.forEach(row => {
+      const nombreCriterio = row[iNombreCrit];
+      const nombreNivel = row[iNombreNivel];
+
+      const criterioId = criteriosPorNombre[nombreCriterio];
+      const key = `${nombreCriterio}|${nombreNivel}`;
+      const nivelId = nivelesPorNombre[key];
+
+      if (criterioId && nivelId) {
+        evaluacionExistente.criterios[criterioId] = nivelId;
+      }
+    });
+
+    return {
+      success: true,
+      data: evaluacionExistente
+    };
+
+  } catch (err) {
+    Logger.log('✖ getExistingRubricaEvaluation: ' + err);
+    return { success: false, data: null };
+  }
+}
+
 function recordRubricaPeerGrade(formData) {
   try {
     // ★ VALIDACIÓN DEL SERVIDOR
