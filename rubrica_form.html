@@ -201,6 +201,74 @@
     <div id="feedback" class="feedback"></div>
   </div>
   <script>
+    // Cargar evaluación existente cuando se selecciona un estudiante
+    document.getElementById('studentSelect').addEventListener('change', function() {
+      const studentId = this.value;
+      const instrumentoID = document.querySelector('input[name="instrumentoID"]').value;
+
+      if (!studentId) {
+        // Limpiar formulario si no hay estudiante seleccionado
+        document.querySelectorAll('input[type="radio"]:checked').forEach(radio => radio.checked = false);
+        document.getElementById('comments').value = '';
+        return;
+      }
+
+      // Buscar evaluación existente
+      const fb = document.getElementById('feedback');
+      fb.style.display = 'block';
+      fb.className = 'feedback';
+      fb.textContent = 'Cargando evaluación existente...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          fb.style.display = 'none';
+
+          if (result.success && result.data) {
+            // Marcar los radio buttons correspondientes
+            Object.keys(result.data.criterios).forEach(criterioId => {
+              const nivelId = result.data.criterios[criterioId];
+              const radioId = 'c_' + criterioId + '_n_' + nivelId;
+              const radio = document.getElementById(radioId);
+              if (radio) {
+                radio.checked = true;
+                // Aplicar estilo visual
+                radio.parentElement.querySelector('.radio-label').style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+                radio.parentElement.querySelector('.radio-label').style.color = '#fff';
+              }
+            });
+
+            // Cargar comentarios
+            if (result.data.comentarios) {
+              document.getElementById('comments').value = result.data.comentarios;
+            }
+
+            // Mostrar mensaje de evaluación existente
+            fb.style.display = 'block';
+            fb.className = 'feedback success';
+            fb.textContent = '✅ Evaluación existente cargada';
+            setTimeout(() => { fb.style.display = 'none'; }, 3000);
+          } else {
+            // No hay evaluación previa, limpiar formulario
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+              radio.checked = false;
+              // Limpiar estilos
+              const label = radio.parentElement.querySelector('.radio-label');
+              if (label) {
+                label.style.background = '';
+                label.style.color = '';
+              }
+            });
+            document.getElementById('comments').value = '';
+          }
+        })
+        .withFailureHandler(function(err) {
+          fb.className = 'feedback error';
+          fb.textContent = '⚠️ Error al cargar evaluación: ' + err.message;
+          setTimeout(() => { fb.style.display = 'none'; }, 3000);
+        })
+        .getExistingRubricaEvaluation(instrumentoID, studentId);
+    });
+
     function submitForm(){
       const instrumentoID = document.querySelector('input[name="instrumentoID"]').value;
       const studentSelect = document.getElementById('studentSelect');
