@@ -4311,9 +4311,12 @@
       tbody.innerHTML = '';
 
       students.forEach(student => {
-        const isEvaluated = evaluatedStudentIds.has(student.id);
+        // Convertir IDs a string para asegurar comparación correcta
+        const isEvaluated = evaluatedStudentIds.has(String(student.id));
+
         const row = document.createElement('tr');
-        row.style.background = isEvaluated ? 'rgba(16, 185, 129, 0.05)' : 'transparent';
+        // Estilo visual mejorado para evaluados
+        row.style.background = isEvaluated ? 'rgba(16, 185, 129, 0.08)' : 'transparent';
 
         row.innerHTML = `
           <td style="text-align: center; padding: 1rem;">
@@ -4329,7 +4332,9 @@
             <div style="font-size: 0.875rem; color: var(--text-light);">${student.email || ''}</div>
           </td>
           <td style="text-align: center; padding: 1rem;">
-            ${isEvaluated ? '<span style="color: var(--secondary); font-weight: 500;">✓ Evaluado</span>' : '<span style="color: var(--text-light);">Pendiente</span>'}
+            ${isEvaluated
+              ? '<span class="badge badge-success" style="background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:12px;">✓ Evaluado</span>'
+              : '<span style="color:#6b7280;">Pendiente</span>'}
           </td>
           <td style="text-align: center; padding: 1rem;">
             <div style="display: flex; gap: 0.5rem; justify-content: center;">
@@ -4340,9 +4345,9 @@
                   👁️ Ver
                 </button>
                 <button class="btn btn-outline btn-edit-student"
-                        style="padding: 0.5rem 0.75rem; font-size: 0.875rem;"
+                        style="padding: 0.5rem 0.75rem; font-size: 0.875rem; border-color: #10b981; color: #059669;"
                         data-student-id="${student.id}">
-                  ✏️ Revisar
+                  👁️ Revisar
                 </button>
               ` : `
                 <button class="btn btn-primary btn-select-student"
@@ -4497,8 +4502,8 @@
      * Abre el panel de evaluación en modo edición para un estudiante específico
      */
     function editStudentEvaluation(studentId) {
-      // 1. Encontrar el objeto estudiante
-      const student = evaluationData.allStudents.find(s => s.id === studentId);
+      // 1. Encontrar el objeto estudiante (comparación con String para robustez)
+      const student = evaluationData.allStudents.find(s => String(s.id) === String(studentId));
       if (!student) return;
 
       // 2. Seleccionarlo como único estudiante (lógica existente)
@@ -4758,64 +4763,50 @@
       const instrument = evaluationData.instrumentDetails;
       const resultado = evaluation.resultado;
 
-      console.log('📝 Pre-llenando formulario con datos recuperados:', resultado);
+      console.log('📝 Cargando datos:', resultado);
 
-      // Cargar notas/comentarios
+      // 1. Cargar Comentarios
       const notesField = document.getElementById('evaluationNotes');
-      if (notesField && evaluation.notes) {
-        notesField.value = evaluation.notes;
+      if (notesField) notesField.value = evaluation.notes || '';
+
+      // 2. Cargar Calificación Directa (si aplica)
+      if (document.getElementById('directGrade') && resultado.calificacion) {
+        document.getElementById('directGrade').value = resultado.calificacion;
       }
 
-      // === LÓGICA PARA RÚBRICAS ===
+      // 3. Cargar Rúbricas (Mapeo por texto)
       if (instrument.tipo === 'Rúbrica' && resultado.criterios) {
-        // Iterar sobre los criterios GUARDADOS en la hoja de cálculo
-        resultado.criterios.forEach(critGuardado => {
+        // Recorremos los bloques de criterios en el HTML
+        document.querySelectorAll('.evaluation-criterion').forEach((critDiv) => {
+          // Extraer nombre del criterio del título (ej: "1. Technical Execution" -> "Technical Execution")
+          const titleEl = critDiv.querySelector('.evaluation-criterion-title');
+          const critName = titleEl.innerText.replace(/^\d+\.\s*/, '').trim();
 
-          // 1. Buscar en el DOM el bloque del criterio que coincida con el nombre
-          // Buscamos todos los títulos de criterios en el formulario generado
-          const domCriterios = document.querySelectorAll('.evaluation-criterion');
+          // Buscar si este criterio tiene nota guardada
+          const savedCrit = resultado.criterios.find(c => c.criterio === critName);
 
-          domCriterios.forEach((domCritDiv, index) => {
-            const titleDiv = domCritDiv.querySelector('.evaluation-criterion-title');
-            // Limpiamos el texto (ej: "1. Defensive Role" -> "Defensive Role") para comparar
-            const domCritText = titleDiv.textContent.replace(/^\d+\.\s*/, '').trim();
+          if (savedCrit) {
+            // Buscar el radio button que coincida con el VALOR guardado (ej: "Competent")
+            // En tu dashboard, los valores de los radios son los Nombres de los Niveles.
+            const radio = Array.from(critDiv.querySelectorAll('input[type="radio"]'))
+              .find(r => r.value === savedCrit.nivel || r.dataset.nombre === savedCrit.nivel);
 
-            if (domCritText === critGuardado.criterio) {
-              // ¡Encontramos el criterio! Ahora buscamos el radio button del nivel
-
-              // Intentamos encontrar el input que tenga el valor exacto (ej: "Competent")
-              // O cuyo data-nombre coincida
-              const radios = domCritDiv.querySelectorAll('input[type="radio"]');
-              let matchFound = false;
-
-              radios.forEach(radio => {
-                const nivelNombre = radio.dataset.nombre || '';
-                const nivelValor = radio.value;
-
-                // Comparamos con lo guardado (critGuardado.nivel)
-                if (nivelValor === critGuardado.nivel || nivelNombre === critGuardado.nivel) {
-                  radio.checked = true;
-                  matchFound = true;
-                }
-              });
-
-              if (!matchFound) {
-                console.warn(`No se encontró coincidencia de nivel para: ${critGuardado.criterio} -> ${critGuardado.nivel}`);
-              }
+            if (radio) {
+              radio.checked = true;
+              // Forzar actualización visual si hay estilos dependientes
+              radio.parentElement.classList.add('selected');
             }
-          });
+          }
         });
-        console.log(`   ✓ Rúbrica cargada: ${resultado.criterios.length} criterios mapeados`);
+      }
 
-      // === LÓGICA PARA LISTAS DE COTEJO ===
-      } else if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
-        // Mapeo por texto del ítem
-        const domItems = document.querySelectorAll('.evaluation-criterion span'); // Span contiene el texto
+      // 4. Cargar Listas de Cotejo
+      if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
+        const domItems = document.querySelectorAll('.evaluation-criterion span');
 
         resultado.items.forEach(itemGuardado => {
           domItems.forEach(span => {
             if (span.textContent.trim() === itemGuardado.item) {
-              // Encontrar el checkbox hermano anterior
               const checkbox = span.parentElement.querySelector('input[type="checkbox"]');
               if (checkbox) {
                 checkbox.checked = itemGuardado.completado;
@@ -4823,14 +4814,16 @@
             }
           });
         });
-        console.log(`   ✓ Lista de Cotejo cargada`);
+      }
 
-      // === LÓGICA PARA CALIFICACIÓN DIRECTA ===
-      } else if (instrument.tipo === 'Calificación Directa' && resultado.calificacion !== undefined) {
-        const gradeInput = document.getElementById('directGrade');
-        if (gradeInput) {
-          gradeInput.value = resultado.calificacion;
-        }
+      // 5. Notificar al usuario
+      const panel = document.querySelector('.evaluation-panel-content');
+      if (panel) {
+        const msg = document.createElement('div');
+        msg.className = 'alert alert-warning';
+        msg.innerHTML = '⚠️ <strong>Modo Revisión:</strong> Editando una evaluación existente.';
+        msg.style.marginBottom = '1rem';
+        panel.insertBefore(msg, panel.firstChild);
       }
     }
 
