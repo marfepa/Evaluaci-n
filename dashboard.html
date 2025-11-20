@@ -4774,6 +4774,9 @@
       const resultado = evaluation.resultado;
       const instrument = evaluationData.instrumentDetails;
 
+      // Guardar resultado existente para uso en otras funciones
+      evaluationData.existingResult = resultado;
+
       console.log('📝 Visualizando datos guardados:', resultado);
 
       // 1. Cargar Comentarios y Notas
@@ -4787,7 +4790,34 @@
       // ==========================================
       // LÓGICA PARA RÚBRICAS (Fuzzy Matching)
       // ==========================================
-      if (instrument.tipo === 'Rúbrica' && resultado.criterios) {
+      if (instrument.tipo === 'Rúbrica') {
+        // Verificar si solo hay calificación agregada sin detalles de criterios
+        if (!resultado.criterios && resultado.calificacion !== undefined) {
+          // Mostrar alerta informativa
+          const formDiv = document.getElementById('evaluationForm');
+          if (formDiv) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-info';
+            alertDiv.style.cssText = `
+              margin-bottom: 1rem;
+              padding: 0.75rem 1rem;
+              background-color: #d1ecf1;
+              border: 1px solid #bee5eb;
+              border-radius: 0.25rem;
+              color: #0c5460;
+              font-size: 0.875rem;
+            `;
+            alertDiv.innerHTML = `
+              <strong>ℹ️ Evaluación anterior:</strong> Calificación total <strong>${resultado.calificacion}</strong>
+              <br>
+              <small>(Detalles por criterio no disponibles para marcado automático)</small>
+            `;
+            formDiv.insertBefore(alertDiv, formDiv.firstChild);
+          }
+          return; // No hay criterios para marcar
+        }
+
+        if (resultado.criterios) {
 
         // Obtener todos los bloques de criterios del HTML
         const domCriterios = document.querySelectorAll('.evaluation-criterion');
@@ -4849,12 +4879,40 @@
             }
           }
         });
+        } // Cierre del if (resultado.criterios)
       }
 
       // ==========================================
       // LÓGICA PARA LISTAS DE COTEJO
       // ==========================================
-      else if (instrument.tipo === 'Lista de Cotejo' && resultado.items) {
+      else if (instrument.tipo === 'Lista de Cotejo') {
+        // Verificar si solo hay calificación agregada sin detalles de items
+        if (!resultado.items && resultado.calificacion !== undefined) {
+          // Mostrar alerta informativa
+          const formDiv = document.getElementById('evaluationForm');
+          if (formDiv) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-info';
+            alertDiv.style.cssText = `
+              margin-bottom: 1rem;
+              padding: 0.75rem 1rem;
+              background-color: #d1ecf1;
+              border: 1px solid #bee5eb;
+              border-radius: 0.25rem;
+              color: #0c5460;
+              font-size: 0.875rem;
+            `;
+            alertDiv.innerHTML = `
+              <strong>ℹ️ Evaluación anterior:</strong> Calificación total <strong>${resultado.calificacion}</strong>
+              <br>
+              <small>(Detalles por item no disponibles para marcado automático)</small>
+            `;
+            formDiv.insertBefore(alertDiv, formDiv.firstChild);
+          }
+          return; // No hay items para marcar
+        }
+
+        if (resultado.items) {
          // Lógica similar simplificada para items
          const checkboxes = document.querySelectorAll('input[type="checkbox"]');
          resultado.items.forEach(savedItem => {
@@ -4870,6 +4928,7 @@
              }
            });
          });
+        } // Cierre del if (resultado.items)
       }
 
       // Feedback visual para el usuario
