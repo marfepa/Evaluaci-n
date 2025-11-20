@@ -137,7 +137,12 @@ function doPost(e) {
       'openConfigDialog': openConfigDialog,
 
       // Evaluación
-      'getInstrumentDetails': getInstrumentDetails
+      'getInstrumentDetails': getInstrumentDetails,
+      'getStudentEvaluation': getStudentEvaluation,
+      'getEvaluationDetails': getEvaluationDetails,
+      'saveEvaluation': saveEvaluation,
+      'deleteExistingEvaluation': deleteExistingEvaluation,
+      'getEvaluationsByInstrument': getEvaluationsByInstrument
     };
 
     // Verificar si la función existe en el mapa
@@ -4789,6 +4794,91 @@ function getEvaluationsByInstrument(instrumentId) {
   } catch (error) {
     Logger.log(`Error getEvaluationsByInstrument: ${error.message}`);
     return [];
+  }
+}
+
+/**
+ * Obtiene los detalles de una evaluación con logging y manejo robusto de errores
+ * Busca primero en 'Evaluaciones' (tiene JSON directo), luego en 'CalificacionesDetalladas'
+ */
+function getEvaluationDetails(studentId, instrumentId) {
+  try {
+    Logger.log(`[getEvaluationDetails] Buscando evaluación detallada para Estudiante: ${studentId}, Instrumento: ${instrumentId}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // Try to find in Evaluaciones sheet first (contains JSON result)
+    const evalSheet = ss.getSheetByName('Evaluaciones');
+    if (evalSheet) {
+      const data = evalSheet.getDataRange().getValues();
+      const headers = data[0];
+
+      const studentIdCol = headers.indexOf('Estudiante ID');
+      const instrumentIdCol = headers.indexOf('Instrumento ID');
+      const resultCol = headers.indexOf('Resultado');
+      const notesCol = headers.indexOf('Notas');
+
+      // Find the evaluation (most recent first if multiple)
+      for (let i = data.length - 1; i >= 1; i--) {
+        const row = data[i];
+        if (String(row[studentIdCol]) === String(studentId) && String(row[instrumentIdCol]) === String(instrumentId)) {
+          Logger.log('[getEvaluationDetails] Evaluación encontrada en hoja Evaluaciones');
+
+          Log.debug('Raw result from Evaluaciones: ' + row[resultCol]);
+
+          let resultado = null;
+          try {
+            resultado = JSON.parse(row[resultCol]);
+            Log.debug('Parsed resultado: ' + JSON.stringify(resultado));
+          } catch (e) {
+            Log.error('Error parsing JSON from Evaluaciones: ' + e.message + ' | Raw: ' + row[resultCol]);
+            // Fallback a calificación agregada si es número
+            const potentialScore = parseFloat(row[resultCol]);
+            if (!isNaN(potentialScore)) {
+              resultado = { calificacion: potentialScore };
+            }
+          }
+
+          return {
+            success: true,
+            found: true,
+            source: 'Evaluaciones',
+            resultado: resultado,
+            notas: row[notesCol] || ''
+          };
+        }
+      }
+    }
+
+    // If not found in Evaluaciones, try CalificacionesDetalladas
+    // Use getStudentEvaluation to reconstruct from individual rows
+    Logger.log('[getEvaluationDetails] Buscando en CalificacionesDetalladas usando getStudentEvaluation');
+    const reconstructed = getStudentEvaluation(studentId, instrumentId);
+
+    if (reconstructed && reconstructed.success) {
+      Log.debug('Evaluación reconstruida desde CalificacionesDetalladas: ' + JSON.stringify(reconstructed.resultado));
+
+      return {
+        success: true,
+        found: true,
+        source: 'CalificacionesDetalladas',
+        resultado: reconstructed.resultado,
+        notas: reconstructed.notes || ''
+      };
+    }
+
+    Logger.log('[getEvaluationDetails] Evaluación no encontrada');
+    return {
+      success: true,
+      found: false
+    };
+
+  } catch (error) {
+    Logger.log(`[getEvaluationDetails] Error: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
