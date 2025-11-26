@@ -5385,6 +5385,103 @@ function getInstrumentDetails(instrumentId) {
   }
 }
 
+/**
+ * Get detailed evaluations for an instrument
+ * Returns complete evaluation data including student info, grades, and results
+ */
+function getEvaluationsByInstrumentDetailed(instrumentId) {
+  try {
+    Logger.log(`[getEvaluationsByInstrumentDetailed] Obteniendo evaluaciones detalladas para instrumento: ${instrumentId}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // Get evaluations from "Evaluaciones" sheet (contains JSON with full data)
+    const evalSheet = ss.getSheetByName('Evaluaciones');
+    if (!evalSheet) {
+      Logger.log('[getEvaluationsByInstrumentDetailed] Hoja "Evaluaciones" no encontrada');
+      return [];
+    }
+
+    const evalData = evalSheet.getDataRange().getValues();
+    const evalHeaders = evalData[0];
+    const evalRows = evalData.slice(1);
+
+    const iInstrumentoId = evalHeaders.indexOf('IDInstrumento');
+    const iEstudianteId = evalHeaders.indexOf('IDEstudiante');
+    const iNombreEstudiante = evalHeaders.indexOf('NombreEstudiante');
+    const iCalificacion = evalHeaders.indexOf('CalificacionTotal');
+    const iFecha = evalHeaders.indexOf('FechaEvaluacion');
+    const iResultadoJSON = evalHeaders.indexOf('ResultadoJSON');
+    const iNotas = evalHeaders.indexOf('Notas');
+
+    const evaluations = [];
+
+    evalRows.forEach(row => {
+      const rowInstrumentId = String(row[iInstrumentoId] || '').trim();
+
+      if (rowInstrumentId === String(instrumentId).trim()) {
+        const resultadoJSON = row[iResultadoJSON] || '{}';
+        let resultado = {};
+
+        try {
+          resultado = JSON.parse(resultadoJSON);
+        } catch (e) {
+          Logger.log(`[getEvaluationsByInstrumentDetailed] Error parseando JSON para estudiante ${row[iNombreEstudiante]}: ${e.message}`);
+        }
+
+        evaluations.push({
+          studentId: row[iEstudianteId] || '',
+          studentName: row[iNombreEstudiante] || '',
+          calificacion: parseFloat(row[iCalificacion]) || 0,
+          fecha: row[iFecha] ? new Date(row[iFecha]).getTime() : null,
+          resultado: resultado,
+          notas: row[iNotas] || ''
+        });
+      }
+    });
+
+    Logger.log(`[getEvaluationsByInstrumentDetailed] Encontradas ${evaluations.length} evaluaciones`);
+    return evaluations;
+
+  } catch (error) {
+    Logger.log(`[getEvaluationsByInstrumentDetailed] Error: ${error.message}`);
+    Logger.log(`[getEvaluationsByInstrumentDetailed] Stack: ${error.stack}`);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing evaluation
+ * Deletes old data and saves new evaluation
+ */
+function updateEvaluation(evaluationData) {
+  try {
+    Logger.log(`[updateEvaluation] Actualizando evaluación para estudiante: ${evaluationData.studentName}`);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    // Delete existing evaluation
+    const deleted = deleteExistingEvaluation(evaluationData.studentId, evaluationData.instrumentId);
+
+    if (deleted) {
+      Logger.log(`[updateEvaluation] Evaluación anterior eliminada`);
+    } else {
+      Logger.log(`[updateEvaluation] No se encontró evaluación anterior (puede ser normal)`);
+    }
+
+    // Save new evaluation using the existing saveEvaluation function
+    const result = saveEvaluation(evaluationData);
+
+    Logger.log(`[updateEvaluation] Evaluación actualizada exitosamente`);
+    return result;
+
+  } catch (error) {
+    Logger.log(`[updateEvaluation] Error: ${error.message}`);
+    Logger.log(`[updateEvaluation] Stack: ${error.stack}`);
+    throw error;
+  }
+}
+
 /****************************************************************
  * FIN FUNCIONES PARA MÓDULO DE EVALUACIÓN                     *
  ****************************************************************/
