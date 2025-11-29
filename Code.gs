@@ -5357,13 +5357,13 @@ function getInstrumentDetails(instrumentId) {
     } else if (instrumento.TipoInstrumento === 'Lista de Cotejo') {
       // Cargar items de la lista de cotejo
       const listaCotejoId = instrumento.IDInstrumentoTipo;
-      const { headers: itemHeaders, values: itemValues } = getSheetData(ss, 'ItemsListaCotejo');
+      const { headers: itemHeaders, values: itemValues } = getSheetData(ss, 'Definicion_ListasCotejo');
 
       const items = itemValues
         .filter(row => row[itemHeaders.indexOf('IDListaCotejo')] === listaCotejoId)
         .map(row => ({
           id: row[itemHeaders.indexOf('IDItem')],
-          descripcion: row[itemHeaders.indexOf('Descripcion')]
+          descripcion: row[itemHeaders.indexOf('DescripcionItem')]
         }));
 
       result.items = items;
